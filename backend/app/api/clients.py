@@ -1,0 +1,224 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List
+from datetime import datetime
+
+from app.db.database import get_db
+from app.db.models import Client
+from app.schemas.client import (
+    ClientCreate,
+    ClientResponse,
+    ClientConfig,
+    ClientConnected,
+    ClientStats
+)
+from app.services.wireguard import wireguard_service
+from app.services.qrcode_service import generate_qr_code
+
+router = APIRouter()
+
+@router.post("/clients", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
+async def create_client(client: ClientCreate, db: Session = Depends(get_db)):
+    """Create a new WireGuard client"""
+    
+    # Check if email already exists
+    existing_client = db.query(Client).filter(Client.email == client.email).first()
+    if existing_client:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Generate WireGuard keys
+    try:
+        private_key, public_key = wireguard_service.generate_keys()
+        preshared_key = wireguard_service.generate_preshared_key()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate keys: {str(e)}"
+        )
+    
+    # Get used IPs
+    used_ips = [c.ip_address for c in db.query(Client).all()]
+    
+    # Get next available IP
+    try:
+        ip_address = wireguard_service.get_next_available_ip(used_ips)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to allocate IP: {str(e)}"
+        )
+    
+    # Create client in database
+    db_client = Client(
+        email=client.email,
+        name=client.name,
+        public_key=public_key,
+        private_key=private_key,
+        ip_address=ip_address,
+        preshared_key=preshared_key,
+        dns=wireguard_service.dns
+    )
+    
+    try:
+        db.add(db_client)
+        db.commit()
+        db.refresh(db_client)
+        
+        # Add peer to WireGuard
+        wireguard_service.add_peer(public_key, ip_address)
+        
+        return db_client
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create client: {str(e)}"
+        )
+
+@router.get("/clients", response_model=List[ClientResponse])
+async def list_clients(
+    skip: int = 0,
+    limit: int = 100,
+    active_only: bool = False,
+    db: Session = Depends(get_db)
+):
+    """List all clients"""
+    query = db.query(Client)
+    
+    if active_only:
+        query = query.filter(Client.is_active == True)
+    
+    clients = query.offset(skip).limit(limit).all()
+    return clients
+
+@router.get("/clients/stats", response_model=ClientStats)
+async def get_stats(db: Session = Depends(get_db)):
+    """Get client statistics"""
+    total_clients = db.query(Client).count()
+    active_clients = db.query(Client).filter(Client.is_active == True).count()
+    
+    # Get connected clients from WireGuard
+    connected_peers = wireguard_service.get_connected_peers()
+    connected_clients = len(connected_peers)
+    
+    return ClientStats(
+        total_clients=total_clients,
+        active_clients=active_clients,
+        connected_clients=connected_clients
+    )
+
+@router.get("/clients/connected", response_model=List[ClientConnected])
+async def get_connected_clients(db: Session = Depends(get_db)):
+    """Get list of currently connected clients"""
+    
+    # Get connected peers from WireGuard
+    connected_peers = wireguard_service.get_connected_peers()
+    
+    # Get clients from database
+    clients = db.query(Client).filter(Client.is_active == True).all()
+    
+    connected_clients = []
+    for client in clients:
+        peer_info = connected_peers.get(client.public_key)
+        if peer_info and peer_info["last_handshake"]:
+            # Update last handshake in database
+            client.last_handshake = peer_info["last_handshake"]
+            db.commit()
+            
+            connected_clients.append(
+                ClientConnected(
+                    id=client.id,
+                    email=client.email,
+                    name=client.name,
+                    ip_address=client.ip_address,
+                    last_handshake=peer_info["last_handshake"],
+                    transfer_rx=peer_info["transfer_rx"],
+                    transfer_tx=peer_info["transfer_tx"]
+                )
+            )
+    
+    return connected_clients
+
+@router.get("/clients/{client_id}", response_model=ClientResponse)
+async def get_client(client_id: int, db: Session = Depends(get_db)):
+    """Get client details"""
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Client not found"
+        )
+    return client
+
+@router.get("/clients/{client_id}/config", response_model=ClientConfig)
+async def get_client_config(client_id: int, db: Session = Depends(get_db)):
+    """Get client configuration with QR code"""
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Client not found"
+        )
+    
+    # Generate configuration
+    config = wireguard_service.generate_client_config(
+        private_key=client.private_key,
+        ip_address=client.ip_address,
+        dns=client.dns
+    )
+    
+    # Generate QR code
+    qr_code = generate_qr_code(config)
+    
+    # Mark as downloaded
+    if not client.config_downloaded:
+        client.config_downloaded = True
+        db.commit()
+    
+    return ClientConfig(config=config, qr_code=qr_code)
+
+@router.delete("/clients/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_client(client_id: int, db: Session = Depends(get_db)):
+    """Delete a client"""
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Client not found"
+        )
+    
+    # Remove from WireGuard
+    wireguard_service.remove_peer(client.public_key)
+    
+    # Delete from database
+    db.delete(client)
+    db.commit()
+    
+    return None
+
+@router.patch("/clients/{client_id}/toggle", response_model=ClientResponse)
+async def toggle_client_status(client_id: int, db: Session = Depends(get_db)):
+    """Toggle client active status"""
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Client not found"
+        )
+    
+    client.is_active = not client.is_active
+    
+    if client.is_active:
+        # Re-add to WireGuard
+        wireguard_service.add_peer(client.public_key, client.ip_address)
+    else:
+        # Remove from WireGuard
+        wireguard_service.remove_peer(client.public_key)
+    
+    db.commit()
+    db.refresh(client)
+    
+    return client

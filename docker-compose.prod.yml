@@ -1,0 +1,46 @@
+# Production Docker Compose with optimized builds
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      WG_INTERFACE: ${WG_INTERFACE}
+      WG_SERVER_IP: ${WG_SERVER_IP}
+      WG_SERVER_PORT: ${WG_SERVER_PORT}
+      WG_SERVER_PUBLIC_KEY: ${WG_SERVER_PUBLIC_KEY}
+      WG_SERVER_PRIVATE_KEY: ${WG_SERVER_PRIVATE_KEY}
+      WG_SERVER_ENDPOINT: ${WG_SERVER_ENDPOINT}
+      WG_NETWORK: ${WG_NETWORK}
+      WG_DNS: ${WG_DNS}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      CORS_ORIGINS: '["https://${DOMAIN}"]'
+    volumes:
+      - /etc/wireguard:/etc/wireguard
+    restart: always
+    cap_add:
+      - NET_ADMIN
+    command: ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"]
+    network_mode: "host"
+
+  caddy:
+    image: caddy:2-alpine
+    network_mode: "host"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./caddy/Caddyfile.prod:/etc/caddy/Caddyfile
+      - ./frontend/dist:/var/www/html
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  caddy_data:
+  caddy_config:
+  caddy_logs:

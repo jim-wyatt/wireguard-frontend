@@ -1,0 +1,41 @@
+# Caddyfile for WireGuard Management
+{
+    # Global options
+    email admin@{$DOMAIN}
+    admin 127.0.0.1:2019
+    servers {
+        protocols h1 h2
+    }
+}
+
+# Main site
+{$DOMAIN:localhost} {
+    # API reverse proxy
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    # Frontend
+    handle {
+        reverse_proxy frontend:5173
+    }
+
+    # Enable gzip compression
+    encode gzip
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Logging
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+}
+

@@ -1,0 +1,87 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-wireguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-wireguard}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - wireguard_network
+    restart: unless-stopped
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-wireguard}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-wireguard}
+      WG_INTERFACE: ${WG_INTERFACE:-wg0}
+      WG_SERVER_IP: ${WG_SERVER_IP:-10.0.0.1}
+      WG_SERVER_PORT: ${WG_SERVER_PORT:-443}
+      WG_SERVER_PUBLIC_KEY: ${WG_SERVER_PUBLIC_KEY}
+      WG_SERVER_PRIVATE_KEY: ${WG_SERVER_PRIVATE_KEY}
+      WG_SERVER_ENDPOINT: ${WG_SERVER_ENDPOINT}
+      WG_NETWORK: ${WG_NETWORK:-10.0.0.0/24}
+      WG_DNS: ${WG_DNS:-1.1.1.1,8.8.8.8}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      CORS_ORIGINS: '["https://${DOMAIN}","http://localhost:5173"]'
+    volumes:
+      - ./backend:/app
+      - /etc/wireguard:/etc/wireguard
+    depends_on:
+      - db
+    networks:
+      - wireguard_network
+    restart: unless-stopped
+    # Required for WireGuard operations
+    cap_add:
+      - NET_ADMIN
+    privileged: true
+
+  # React Frontend (Development)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    environment:
+      VITE_API_URL: /api
+    networks:
+      - wireguard_network
+    restart: unless-stopped
+
+  # Caddy Reverse Proxy
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - wireguard_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+  caddy_logs:
+
+networks:
+  wireguard_network:
+    driver: bridge

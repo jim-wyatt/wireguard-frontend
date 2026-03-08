@@ -1,0 +1,43 @@
+# Production Caddyfile with HTTPS
+{
+    email admin@{$DOMAIN}
+    admin 127.0.0.1:2019
+    servers {
+        protocols h1 h2
+    }
+}
+
+# Main site with HTTPS
+https://{$DOMAIN}:443 {
+    # API reverse proxy
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    # Frontend (production build)
+    handle {
+        root * /var/www/html
+        try_files {path} /index.html
+        file_server
+    }
+
+    # Enable gzip compression
+    encode gzip
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # Logging
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+}
+
