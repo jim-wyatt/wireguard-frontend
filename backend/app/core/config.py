@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     WG_SERVER_ENDPOINT: str = ""
     WG_NETWORK: str = "10.0.0.0/24"
     WG_DNS: str = "1.1.1.1,8.8.8.8"
+    CADDY_ACCESS_LOG_PATH: str = "/var/log/caddy/access.log"
     
     # API
     API_SECRET_KEY: str = "change-this-secret-key"

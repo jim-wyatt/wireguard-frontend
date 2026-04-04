@@ -8,7 +8,7 @@ const normalizeApiBaseUrl = (value) => {
   return `${trimmed.replace(/\/$/, '')}/api`;
 };
 
-const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL);
+export const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -64,6 +64,49 @@ export const clientsApi = {
   
   // Toggle client status
   toggleClientStatus: (id) => api.patch(`/clients/${id}/toggle`),
+
+  // Stream Caddy access log lines.
+  streamCaddyAccessLog: async ({ signal, tail = 100, onLine }) => {
+    const token = (window.localStorage.getItem('apiToken') || '').trim();
+    const headers = token
+      ? { Authorization: `Bearer ${token}` }
+      : {};
+
+    const response = await fetch(`${API_BASE_URL}/logs/caddy/access/stream?tail=${tail}&_ts=${Date.now()}`, {
+      method: 'GET',
+      headers,
+      cache: 'no-store',
+      signal,
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`Log stream failed (${response.status}) ${body}`.trim());
+    }
+
+    if (!response.body) {
+      throw new Error('Readable stream is not available in this browser');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.length > 0) onLine(line);
+      }
+    }
+
+    if (buffer.length > 0) onLine(buffer);
+  },
 };
 
 export default api;

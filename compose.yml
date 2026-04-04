@@ -33,6 +33,7 @@ services:
     volumes:
       - ./backend:/app
       - /etc/wireguard:/etc/wireguard
+      - caddy_logs:/var/log/caddy:ro
     depends_on:
       - db
     network_mode: "host"

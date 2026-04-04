@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api import clients
+from app.api import logs
 from app.db.database import engine, Base, SessionLocal
 from app.services.client_sync import sync_clients_with_wireguard
 
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
 
     # Include routers
     app.include_router(clients.router, prefix="/api", tags=["clients"])
+    app.include_router(logs.router, prefix="/api", tags=["logs"])
 
     @app.get("/")
     async def root():

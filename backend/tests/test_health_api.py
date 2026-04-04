@@ -26,3 +26,4 @@ def test_openapi_contract_exposes_client_routes(client):
     assert "/api/clients" in paths
     assert "/api/clients/stats" in paths
     assert "/api/clients/connected" in paths
+    assert "/api/logs/caddy/access/stream" in paths

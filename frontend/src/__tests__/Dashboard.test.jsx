@@ -6,6 +6,7 @@ vi.mock('../services/api', () => ({
   clientsApi: {
     getStats: vi.fn(),
     getConnectedClients: vi.fn(),
+    streamCaddyAccessLog: vi.fn().mockResolvedValue(undefined),
   },
 }))
 

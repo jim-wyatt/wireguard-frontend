@@ -16,13 +16,18 @@ import {
   Menu,
   MenuItem,
   Avatar,
+  Tooltip,
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import PeopleIcon from '@mui/icons-material/People'
 import VpnKeyIcon from '@mui/icons-material/VpnKey'
 import LogoutIcon from '@mui/icons-material/Logout'
+import DarkModeIcon from '@mui/icons-material/DarkMode'
+import LightModeIcon from '@mui/icons-material/LightMode'
+import ViewSidebarIcon from '@mui/icons-material/ViewSidebar'
 import { useAuth } from '../context/AuthContext'
+import { useUi } from '../context/UiContext'
 
 const drawerWidth = 240
 
@@ -32,6 +37,12 @@ function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { logout } = useAuth()
+  const {
+    matrixMode,
+    sidebarVisible,
+    toggleMatrixMode,
+    toggleSidebarVisible,
+  } = useUi()
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen)
@@ -89,8 +100,8 @@ function Layout() {
       <AppBar
         position="fixed"
         sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
+          width: { sm: sidebarVisible ? `calc(100% - ${drawerWidth}px)` : '100%' },
+          ml: { sm: sidebarVisible ? `${drawerWidth}px` : 0 },
         }}
       >
         <Toolbar>
@@ -106,6 +117,16 @@ function Layout() {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             WireGuard Management
           </Typography>
+          <Tooltip title={sidebarVisible ? 'Hide sidebar' : 'Show sidebar'}>
+            <IconButton color="inherit" onClick={toggleSidebarVisible}>
+              <ViewSidebarIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={matrixMode ? 'Switch to light mode' : 'Switch to Matrix mode'}>
+            <IconButton color="inherit" onClick={toggleMatrixMode}>
+              {matrixMode ? <LightModeIcon /> : <DarkModeIcon />}
+            </IconButton>
+          </Tooltip>
           <IconButton
             color="inherit"
             onClick={handleMenuOpen}
@@ -128,7 +149,7 @@ function Layout() {
       </AppBar>
       <Box
         component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+        sx={{ width: { sm: sidebarVisible ? drawerWidth : 0 }, flexShrink: { sm: 0 } }}
       >
         <Drawer
           variant="temporary"
@@ -147,7 +168,7 @@ function Layout() {
         <Drawer
           variant="permanent"
           sx={{
-            display: { xs: 'none', sm: 'block' },
+            display: { xs: 'none', sm: sidebarVisible ? 'block' : 'none' },
             '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
           }}
           open
@@ -160,7 +181,7 @@ function Layout() {
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          width: { sm: sidebarVisible ? `calc(100% - ${drawerWidth}px)` : '100%' },
         }}
       >
         <Toolbar />

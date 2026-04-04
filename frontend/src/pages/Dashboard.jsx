@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Grid,
   Paper,
@@ -6,6 +6,8 @@ import {
   Box,
   Card,
   CardContent,
+  Button,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -19,15 +21,126 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import SignalCellularAltIcon from '@mui/icons-material/SignalCellularAlt'
 import { clientsApi } from '../services/api'
 
+function parseAccessLogLine(line) {
+  try {
+    const parsed = JSON.parse(line)
+    const request = parsed?.request || {}
+    const headers = request?.headers || {}
+
+    const timestamp =
+      typeof parsed?.ts === 'number'
+        ? new Date(parsed.ts * 1000).toLocaleTimeString()
+        : '-'
+
+    const status = Number.isFinite(parsed?.status) ? parsed.status : null
+    const durationMs =
+      typeof parsed?.duration === 'number'
+        ? Math.round(parsed.duration * 1000)
+        : null
+
+    return {
+      id: `${parsed?.ts || Date.now()}-${request?.method || 'UNKNOWN'}-${request?.uri || Math.random()}`,
+      timestamp,
+      ip: request?.client_ip || request?.remote_ip || '-',
+      method: request?.method || '-',
+      path: request?.uri || '-',
+      status,
+      durationMs,
+      bytes: Number.isFinite(parsed?.size) ? parsed.size : null,
+      userAgent: headers['User-Agent']?.[0] || '-',
+    }
+  } catch {
+    return null
+  }
+}
+
+function statusColor(status) {
+  if (!status) return 'default'
+  if (status >= 500) return 'error'
+  if (status >= 400) return 'warning'
+  if (status >= 300) return 'info'
+  return 'success'
+}
+
 function Dashboard() {
   const [stats, setStats] = useState(null)
   const [connectedClients, setConnectedClients] = useState([])
+  const [logEntries, setLogEntries] = useState([])
+  const [logStatus, setLogStatus] = useState('idle')
+  const [logError, setLogError] = useState('')
   const [loading, setLoading] = useState(true)
+  const reconnectTimerRef = useRef(null)
 
   useEffect(() => {
     loadData()
     const interval = setInterval(loadData, 3000) // Refresh every 3 seconds for real-time updates
     return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    const token = (window.localStorage.getItem('apiToken') || '').trim()
+    if (!token || typeof window.fetch !== 'function') {
+      setLogStatus('disabled')
+      return undefined
+    }
+
+    let isMounted = true
+    let controller = new AbortController()
+
+    const clearReconnect = () => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
+      }
+    }
+
+    const scheduleReconnect = () => {
+      clearReconnect()
+      reconnectTimerRef.current = setTimeout(() => {
+        if (isMounted) connectStream()
+      }, 2000)
+    }
+
+    const connectStream = async () => {
+      controller = new AbortController()
+      setLogStatus('connecting')
+      setLogError('')
+
+      try {
+        await clientsApi.streamCaddyAccessLog({
+          signal: controller.signal,
+          tail: 120,
+          onLine: (line) => {
+            if (!isMounted) return
+            const parsed = parseAccessLogLine(line)
+            if (!parsed) return
+            setLogStatus('live')
+            setLogEntries((prev) => {
+              const next = [parsed, ...prev]
+              return next.length > 500 ? next.slice(0, 500) : next
+            })
+          },
+        })
+
+        if (isMounted) {
+          setLogStatus('disconnected')
+          scheduleReconnect()
+        }
+      } catch (err) {
+        if (!isMounted || controller.signal.aborted) return
+        setLogStatus('error')
+        setLogError(err?.message || 'Unable to stream logs')
+        scheduleReconnect()
+      }
+    }
+
+    connectStream()
+
+    return () => {
+      isMounted = false
+      clearReconnect()
+      controller.abort()
+    }
   }, [])
 
   const loadData = async () => {
@@ -146,6 +259,91 @@ function Dashboard() {
                     <TableCell>{formatDate(client.last_handshake)}</TableCell>
                     <TableCell align="right">{formatBytes(client.transfer_rx)}</TableCell>
                     <TableCell align="right">{formatBytes(client.transfer_tx)}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+
+      <Paper sx={{ p: 2, mt: 3 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+          <Typography variant="h6">Live Caddy Access Log</Typography>
+          <Stack direction="row" spacing={1}>
+            <Chip
+              size="small"
+              color={
+                logStatus === 'live'
+                  ? 'success'
+                  : logStatus === 'connecting'
+                    ? 'warning'
+                    : logStatus === 'error'
+                      ? 'error'
+                      : 'default'
+              }
+              label={
+                logStatus === 'live'
+                  ? 'Live'
+                  : logStatus === 'connecting'
+                    ? 'Connecting'
+                    : logStatus === 'disconnected'
+                      ? 'Disconnected'
+                      : logStatus === 'disabled'
+                        ? 'Disabled'
+                        : 'Error'
+              }
+            />
+            <Button size="small" onClick={() => setLogEntries([])}>
+              Clear
+            </Button>
+          </Stack>
+        </Stack>
+
+        {logError && (
+          <Typography color="error" variant="body2" sx={{ mb: 1 }}>
+            {logError}
+          </Typography>
+        )}
+
+        <TableContainer sx={{ maxHeight: 380 }}>
+          <Table stickyHeader size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Time</TableCell>
+                <TableCell>IP</TableCell>
+                <TableCell>Method</TableCell>
+                <TableCell>Path</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell align="right">Latency</TableCell>
+                <TableCell align="right">Bytes</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {logEntries.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7}>
+                    No access entries yet. New requests appear at the top.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                logEntries.map((entry) => (
+                  <TableRow key={entry.id} hover>
+                    <TableCell>{entry.timestamp}</TableCell>
+                    <TableCell>{entry.ip}</TableCell>
+                    <TableCell>
+                      <Chip label={entry.method} size="small" />
+                    </TableCell>
+                    <TableCell title={entry.userAgent}>{entry.path}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={entry.status ?? '-'}
+                        size="small"
+                        color={statusColor(entry.status)}
+                      />
+                    </TableCell>
+                    <TableCell align="right">{entry.durationMs != null ? `${entry.durationMs} ms` : '-'}</TableCell>
+                    <TableCell align="right">{entry.bytes != null ? entry.bytes : '-'}</TableCell>
                   </TableRow>
                 ))
               )}
