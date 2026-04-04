@@ -32,6 +32,9 @@ https://{$DOMAIN}:443 {
         Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
         Referrer-Policy "strict-origin-when-cross-origin"
         X-Permitted-Cross-Domain-Policies "none"
+        Cross-Origin-Opener-Policy "same-origin"
+        Cross-Origin-Embedder-Policy "require-corp"
+        Cross-Origin-Resource-Policy "same-origin"
         -Server
     }
 

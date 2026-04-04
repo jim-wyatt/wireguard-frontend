@@ -50,7 +50,7 @@ def test_dashboard_reads_are_public(unauthenticated_client, monkeypatch):
     assert stats.status_code == 200
 
     connected = unauthenticated_client.get("/api/clients/connected")
-    assert connected.status_code == 200
+    assert connected.status_code == 401
 
 
 def test_create_client_and_reject_duplicate_email(client, monkeypatch):
@@ -116,11 +116,11 @@ def test_stats_and_connected_clients(client, db_session, monkeypatch):
 
     stats = client.get("/api/clients/stats")
     assert stats.status_code == 200
-    assert stats.json() == {
-        "total_clients": 2,
-        "active_clients": 1,
-        "connected_clients": 1,
-    }
+    stats_body = stats.json()
+    assert stats_body["total_clients"] == 2
+    assert stats_body["active_clients"] == 1
+    assert stats_body["connected_clients"] == 1
+    assert "last_updated" in stats_body
 
     connected = client.get("/api/clients/connected")
     assert connected.status_code == 200

@@ -71,10 +71,10 @@ logs-caddy:
 
 test:
 	@echo "Running backend tests..."
-	cd backend && source venv/bin/activate && pytest
+	bash -c 'cd backend && . venv/bin/activate && API_AUTH_TOKEN=test-secret-key PYTHONPATH=. pytest'
 	@echo "Running frontend tests..."
 	chmod +x scripts/ensure-node-lts.sh
-	bash -c 'source scripts/ensure-node-lts.sh && cd frontend && npm test'
+	bash -c 'source scripts/ensure-node-lts.sh && cd frontend && npm run test:run'
 
 smoke:
 	@echo "Running API smoke tests against deployed environment..."
