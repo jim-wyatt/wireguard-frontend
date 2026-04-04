@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import {
   AppBar,
   Box,
@@ -13,21 +13,42 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
+  Menu,
+  MenuItem,
+  Avatar,
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import PeopleIcon from '@mui/icons-material/People'
 import VpnKeyIcon from '@mui/icons-material/VpnKey'
+import LogoutIcon from '@mui/icons-material/Logout'
+import { useAuth } from '../context/AuthContext'
 
 const drawerWidth = 240
 
-function Layout({ children }) {
+function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [menuAnchor, setMenuAnchor] = useState(null)
   const navigate = useNavigate()
   const location = useLocation()
+  const { logout } = useAuth()
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen)
+  }
+
+  const handleMenuOpen = (e) => {
+    setMenuAnchor(e.currentTarget)
+  }
+
+  const handleMenuClose = () => {
+    setMenuAnchor(null)
+  }
+
+  const handleLogout = () => {
+    handleMenuClose()
+    logout()
+    navigate('/login')
   }
 
   const menuItems = [
@@ -82,9 +103,27 @@ function Layout({ children }) {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div">
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             WireGuard Management
           </Typography>
+          <IconButton
+            color="inherit"
+            onClick={handleMenuOpen}
+          >
+            <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
+              A
+            </Avatar>
+          </IconButton>
+          <Menu
+            anchorEl={menuAnchor}
+            open={Boolean(menuAnchor)}
+            onClose={handleMenuClose}
+          >
+            <MenuItem onClick={handleLogout}>
+              <LogoutIcon sx={{ mr: 1 }} />
+              Logout
+            </MenuItem>
+          </Menu>
         </Toolbar>
       </AppBar>
       <Box
@@ -125,7 +164,7 @@ function Layout({ children }) {
         }}
       >
         <Toolbar />
-        {children}
+        <Outlet />
       </Box>
     </Box>
   )
