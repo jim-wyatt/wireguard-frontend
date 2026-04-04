@@ -18,6 +18,7 @@ from app.schemas.client import (
 )
 from app.services.wireguard import wireguard_service
 from app.services.qrcode_service import generate_qr_code
+from app.services.client_sync import sync_clients_with_wireguard_if_stale
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -116,6 +117,8 @@ async def list_clients(
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
 
+    sync_clients_with_wireguard_if_stale(db)
+
     query = db.query(Client)
     
     if active_only:
@@ -133,6 +136,8 @@ async def get_stats(
     """Get client statistics"""
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
+
+    sync_clients_with_wireguard_if_stale(db)
 
     total_clients = db.query(Client).count()
     active_clients = db.query(Client).filter(Client.is_active == True).count()
@@ -153,7 +158,8 @@ async def get_stats(
     return ClientStats(
         total_clients=total_clients,
         active_clients=active_clients,
-        connected_clients=connected_clients
+        connected_clients=connected_clients,
+        last_updated=now,
     )
 
 @router.get("/clients/connected", response_model=List[ClientConnected])
@@ -167,6 +173,8 @@ async def get_connected_clients(
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
 
+    sync_clients_with_wireguard_if_stale(db)
+
     # Get connected peers from WireGuard
     connected_peers = wireguard_service.get_connected_peers()
     
@@ -178,24 +186,32 @@ async def get_connected_clients(
     timeout_threshold = now - timedelta(seconds=settings.WG_CONNECTED_TIMEOUT_SECONDS)
     
     connected_clients = []
+    db_updated = False
     for client in clients:
         peer_info = connected_peers.get(client.public_key)
-        if peer_info and peer_info["last_handshake"] and peer_info["last_handshake"] > timeout_threshold:
-            # Update last handshake in database
-            client.last_handshake = peer_info["last_handshake"]
-            db.commit()
-            
+        if not peer_info:
+            continue
+
+        live_handshake = peer_info.get("last_handshake")
+        if client.last_handshake != live_handshake:
+            client.last_handshake = live_handshake
+            db_updated = True
+
+        if live_handshake and live_handshake > timeout_threshold:
             connected_clients.append(
                 ClientConnected(
                     id=client.id,
                     email=client.email,
                     name=client.name,
                     ip_address=client.ip_address,
-                    last_handshake=peer_info["last_handshake"],
+                    last_handshake=live_handshake,
                     transfer_rx=peer_info["transfer_rx"],
                     transfer_tx=peer_info["transfer_tx"]
                 )
             )
+
+    if db_updated:
+        db.commit()
     
     return connected_clients
 

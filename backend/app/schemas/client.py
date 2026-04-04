@@ -41,3 +41,4 @@ class ClientStats(BaseModel):
     total_clients: int
     active_clients: int
     connected_clients: int
+    last_updated: datetime

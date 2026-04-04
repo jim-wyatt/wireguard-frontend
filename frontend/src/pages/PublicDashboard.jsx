@@ -18,6 +18,13 @@ import { clientsApi } from '../services/api'
 function PublicDashboard() {
   const [stats, setStats] = useState(null)
 
+  const formatLastUpdated = (value) => {
+    if (!value) return 'Unknown'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return 'Unknown'
+    return date.toLocaleString()
+  }
+
   useEffect(() => {
     const loadStats = async () => {
       try {
@@ -35,11 +42,22 @@ function PublicDashboard() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 6 }}>
-      <Typography variant="h3" gutterBottom>
-        WireGuard Status
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+        <Box
+          component="img"
+          src="/favicon.svg"
+          alt="Security shield"
+          sx={{ width: 40, height: 40 }}
+        />
+        <Typography variant="h3" gutterBottom sx={{ mb: 0 }}>
+          WireGuard Status
+        </Typography>
+      </Box>
       <Typography color="text.secondary" sx={{ mb: 4 }}>
         Public aggregate metrics for the VPN service.
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        Last updated: {formatLastUpdated(stats?.last_updated)}
       </Typography>
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
