@@ -142,8 +142,6 @@ async def get_stats(
         if peer.get("last_handshake") and peer["last_handshake"] > timeout_threshold
     )
     
-    logger.info(f"Stats: total={total_clients}, active={active_clients}, wg_peers={len(connected_peers)}, connected={connected_clients}")
-    
     return ClientStats(
         total_clients=total_clients,
         active_clients=active_clients,
