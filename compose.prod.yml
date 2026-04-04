@@ -21,6 +21,7 @@ services:
       CORS_ORIGINS: '["https://${DOMAIN}"]'
     volumes:
       - /etc/wireguard:/etc/wireguard
+      - backend_data:/var/lib/wgapp
     restart: always
     cap_drop:
       - ALL
@@ -47,6 +48,7 @@ services:
     restart: always
 
 volumes:
+  backend_data:
   caddy_data:
   caddy_config:
   caddy_logs:
