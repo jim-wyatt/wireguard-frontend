@@ -7,18 +7,24 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Request
 
+from app.core.auth import Role, optional_api_auth
 from app.core.config import settings
 from app.services.wireguard import wireguard_service
 
 router = APIRouter()
 PROCESS_STARTED_AT = time.time()
+_PROM_LINE_RE = re.compile(
+    r"^([a-zA-Z_:][a-zA-Z0-9_:]*)(\{[^}]*\})?\s+([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)"
+)
+_PROM_LABEL_RE = re.compile(r'(\w+)="((?:\\.|[^"])*)"')
 
 
 def _resolve_report_path(filename: str) -> Path:
@@ -366,6 +372,387 @@ def _wireguard_context() -> dict:
     }
 
 
+def _mask_value(value: str | None) -> str | None:
+    if value is None:
+        return None
+    text = str(value)
+    if len(text) <= 6:
+        return "*" * len(text)
+    return f"{text[:3]}{'*' * (len(text) - 5)}{text[-2:]}"
+
+
+def _is_authenticated(request: Request) -> bool:
+    role = getattr(request.state, "auth_role", None)
+    return role in {Role.PUBLIC.value, Role.WRITER.value}
+
+
+def _redact_cloud_context(cloud: dict) -> dict:
+    redacted = dict(cloud)
+    # Hide cloud identifiers in public mode, similar to PII handling.
+    for key in (
+        "account_id",
+        "instance_id",
+        "vpc_id",
+        "subnet_id",
+        "iam_role_name",
+        "iam_instance_profile_arn",
+    ):
+        redacted[key] = _mask_value(redacted.get(key))
+    return redacted
+
+
+def _parse_host_port(address: str | None) -> tuple[str | None, int | None]:
+    value = (address or "").strip()
+    if not value:
+        return None, None
+    if "://" in value:
+        parsed = urllib.parse.urlparse(value)
+        return parsed.hostname, parsed.port
+    if ":" not in value:
+        return None, None
+    host, raw_port = value.rsplit(":", 1)
+    try:
+        port = int(raw_port)
+    except ValueError:
+        return None, None
+    if not host or port <= 0 or port > 65535:
+        return None, None
+    return host, port
+
+
+def _tcp_reachable(host: str | None, port: int | None, timeout_seconds: float = 1.5) -> bool:
+    if not host or not port:
+        return False
+    try:
+        with socket.create_connection((host, port), timeout=timeout_seconds):
+            return True
+    except OSError:
+        return False
+
+
+def _process_cmdline_contains(needle: str) -> bool:
+    target = needle.strip().lower()
+    if not target:
+        return False
+    proc = Path("/proc")
+    if not proc.exists():
+        return False
+
+    for entry in proc.iterdir():
+        if not entry.is_dir() or not entry.name.isdigit():
+            continue
+        try:
+            cmdline = (entry / "cmdline").read_bytes().replace(b"\x00", b" ").decode("utf-8", errors="ignore").lower()
+        except OSError:
+            continue
+        if target in cmdline:
+            return True
+    return False
+
+
+def _probe_http(endpoint: str, timeout_seconds: float = 2.0) -> dict:
+    request = urllib.request.Request(endpoint)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            return {
+                "available": 200 <= response.status < 400,
+                "status_code": response.status,
+                "error": None,
+                "mode": "http",
+            }
+    except urllib.error.HTTPError as exc:
+        return {
+            "available": False,
+            "status_code": exc.code,
+            "error": f"http {exc.code}",
+            "mode": "http",
+        }
+    except Exception as exc:
+        return {
+            "available": False,
+            "status_code": None,
+            "error": str(exc),
+            "mode": "http",
+        }
+
+
+def _fetch_text(endpoint: str, timeout_seconds: float = 3.0) -> str | None:
+    request = urllib.request.Request(endpoint)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            return response.read().decode("utf-8", errors="replace")
+    except Exception:
+        return None
+
+
+def _fetch_json(endpoint: str, timeout_seconds: float = 3.0) -> dict | None:
+    payload = _fetch_text(endpoint, timeout_seconds=timeout_seconds)
+    if not payload:
+        return None
+    try:
+        return json.loads(payload)
+    except json.JSONDecodeError:
+        return None
+
+
+def _parse_prom_labels(raw: str | None) -> dict[str, str]:
+    if not raw:
+        return {}
+    labels: dict[str, str] = {}
+    for key, value in _PROM_LABEL_RE.findall(raw):
+        labels[key] = value.replace(r'\"', '"').replace(r"\\", "\\")
+    return labels
+
+
+def _prom_samples(text: str, metric_name: str) -> list[dict]:
+    samples: list[dict] = []
+    for line in text.splitlines():
+        raw = line.strip()
+        if not raw or raw.startswith("#"):
+            continue
+        match = _PROM_LINE_RE.match(raw)
+        if not match:
+            continue
+        name, raw_labels, raw_value = match.groups()
+        if name != metric_name:
+            continue
+        try:
+            value = float(raw_value)
+        except ValueError:
+            continue
+        samples.append({"labels": _parse_prom_labels(raw_labels), "value": value})
+    return samples
+
+
+def _prom_first(text: str, metric_name: str, labels: dict[str, str] | None = None) -> float | None:
+    for sample in _prom_samples(text, metric_name):
+        if labels and any(sample["labels"].get(k) != v for k, v in labels.items()):
+            continue
+        return sample["value"]
+    return None
+
+
+def _sidecar_attestation() -> dict:
+    sidecars: dict[str, dict] = {}
+
+    node_text = _fetch_text(settings.NODE_EXPORTER_ENDPOINT_URL)
+    if node_text:
+        mem_total = _prom_first(node_text, "node_memory_MemTotal_bytes")
+        mem_available = _prom_first(node_text, "node_memory_MemAvailable_bytes")
+        mem_used_percent = None
+        if mem_total and mem_total > 0 and mem_available is not None:
+            mem_used_percent = ((mem_total - mem_available) / mem_total) * 100.0
+        sidecars["node_exporter"] = {
+            "available": True,
+            "healthy": True,
+            "load1": _prom_first(node_text, "node_load1"),
+            "memory_used_percent": mem_used_percent,
+        }
+    else:
+        sidecars["node_exporter"] = {"available": False, "healthy": False}
+
+    podman_text = _fetch_text(settings.PODMAN_EXPORTER_ENDPOINT_URL)
+    if podman_text:
+        states = _prom_samples(podman_text, "podman_container_state")
+        running = sum(1 for s in states if int(s["value"]) == 2)
+        exited = sum(1 for s in states if int(s["value"]) == 5)
+        sidecars["podman_exporter"] = {
+            "available": True,
+            "healthy": running > 0,
+            "containers_running": running,
+            "containers_exited": exited,
+        }
+    else:
+        sidecars["podman_exporter"] = {"available": False, "healthy": False}
+
+    pg_text = _fetch_text(settings.POSTGRES_EXPORTER_ENDPOINT_URL)
+    if pg_text:
+        pg_up = _prom_first(pg_text, "pg_up")
+        num_backends = _prom_first(pg_text, "pg_stat_database_numbackends", labels={"datname": settings.POSTGRES_DB})
+        db_size = _prom_first(pg_text, "pg_database_size_bytes", labels={"datname": settings.POSTGRES_DB})
+        sidecars["postgres_exporter"] = {
+            "available": True,
+            "healthy": bool(pg_up and pg_up >= 1.0),
+            "up": pg_up,
+            "num_backends": num_backends,
+            "database_size_bytes": db_size,
+        }
+    else:
+        sidecars["postgres_exporter"] = {"available": False, "healthy": False}
+
+    falco_text = _fetch_text(settings.FALCOSIDEKICK_ENDPOINT_URL)
+    if falco_text:
+        inputs_total = sum(s["value"] for s in _prom_samples(falco_text, "falcosidekick_inputs"))
+        rejected = sum(
+            s["value"]
+            for s in _prom_samples(falco_text, "falcosidekick_inputs")
+            if s["labels"].get("status") == "rejected"
+        )
+        sidecars["falcosidekick"] = {
+            "available": True,
+            "healthy": True,
+            "inputs_total": inputs_total,
+            "inputs_rejected": rejected,
+            "go_goroutines": _prom_first(falco_text, "go_goroutines"),
+        }
+    else:
+        sidecars["falcosidekick"] = {"available": False, "healthy": False}
+
+    crowdsec_health = _fetch_json(settings.CROWDSEC_ENDPOINT_URL)
+    if crowdsec_health:
+        status = str(crowdsec_health.get("status") or "unknown").lower()
+        sidecars["crowdsec"] = {
+            "available": True,
+            "healthy": status == "up",
+            "status": status,
+        }
+    else:
+        sidecars["crowdsec"] = {"available": False, "healthy": False}
+
+    trivy_version = _fetch_json(settings.TRIVY_SERVER_ENDPOINT_URL)
+    if trivy_version:
+        db = trivy_version.get("VulnerabilityDB") or {}
+        updated_at = db.get("UpdatedAt")
+        age_hours = None
+        try:
+            if updated_at:
+                updated_dt = datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
+                age_hours = max(0.0, (datetime.now(timezone.utc) - updated_dt).total_seconds() / 3600.0)
+        except Exception:
+            age_hours = None
+        sidecars["trivy_server"] = {
+            "available": True,
+            "healthy": bool(trivy_version.get("Version")),
+            "version": trivy_version.get("Version"),
+            "db_updated_at": updated_at,
+            "db_next_update": db.get("NextUpdate"),
+            "db_age_hours": age_hours,
+        }
+    else:
+        sidecars["trivy_server"] = {"available": False, "healthy": False}
+
+    parca_root = _fetch_text(settings.PARCA_SERVER_ENDPOINT_URL)
+    parca_metrics = _fetch_text(f"{settings.PARCA_SERVER_ENDPOINT_URL.rstrip('/')}/metrics")
+    parca_version = None
+    if parca_root:
+        match = re.search(r"window\.APP_VERSION\s*=\s*'([^']+)'", parca_root)
+        if match:
+            parca_version = match.group(1)
+    if parca_metrics:
+        sidecars["parca"] = {
+            "available": True,
+            "healthy": True,
+            "ui_version": parca_version,
+            "go_goroutines": _prom_first(parca_metrics, "go_goroutines"),
+            "frostdb_lsm_size_bytes": sum(s["value"] for s in _prom_samples(parca_metrics, "frostdb_lsm_level_size_bytes")),
+        }
+    else:
+        sidecars["parca"] = {"available": False, "healthy": False, "ui_version": parca_version}
+
+    ebpf_text = _fetch_text(settings.EBPF_EXPORTER_ENDPOINT_URL)
+    if ebpf_text:
+        version = None
+        for sample in _prom_samples(ebpf_text, "go_build_info"):
+            candidate = sample["labels"].get("version")
+            if candidate:
+                version = candidate
+                break
+        sidecars["ebpf_agent"] = {
+            "available": True,
+            "healthy": True,
+            "version": version,
+            "go_goroutines": _prom_first(ebpf_text, "go_goroutines"),
+            "debuginfo_upload_request_bytes": _prom_first(ebpf_text, "debuginfo_upload_request_bytes"),
+        }
+    else:
+        sidecars["ebpf_agent"] = {"available": False, "healthy": False}
+
+    available = sum(1 for sidecar in sidecars.values() if sidecar.get("available"))
+    healthy = sum(1 for sidecar in sidecars.values() if sidecar.get("healthy"))
+    total = len(sidecars)
+    return {
+        "services": sidecars,
+        "summary": {
+            "available": available,
+            "healthy": healthy,
+            "total": total,
+            "percent_healthy": int((healthy / total) * 100) if total else 0,
+        },
+    }
+
+
+def _source_attestation() -> dict:
+    configured = [
+        ("node-exporter", "telemetry", settings.NODE_EXPORTER_ENDPOINT_URL),
+        ("podman-exporter", "telemetry", settings.PODMAN_EXPORTER_ENDPOINT_URL),
+        ("postgres-exporter", "telemetry", settings.POSTGRES_EXPORTER_ENDPOINT_URL),
+        ("parca-server", "profiling", settings.PARCA_SERVER_ENDPOINT_URL),
+        ("ebpf", "profiling", settings.EBPF_EXPORTER_ENDPOINT_URL),
+        ("falcosidekick", "security", settings.FALCOSIDEKICK_ENDPOINT_URL),
+        ("crowdsec", "security", settings.CROWDSEC_ENDPOINT_URL),
+        ("trivy-server", "security", settings.TRIVY_SERVER_ENDPOINT_URL),
+    ]
+
+    probes = []
+    for source_id, category, endpoint in configured:
+        url = (endpoint or "").strip()
+        if not url:
+            continue
+
+        if source_id == "ebpf":
+            probe = _probe_http(url)
+            if not probe["available"]:
+                remote_host, remote_port = _parse_host_port(settings.PARCA_REMOTE_STORE_ADDRESS)
+                remote_reachable = _tcp_reachable(remote_host, remote_port)
+                agent_running = _process_cmdline_contains("parca-agent")
+                delivery_ok = remote_reachable and agent_running
+                probe = {
+                    "available": delivery_ok,
+                    "status_code": probe["status_code"],
+                    "error": None if delivery_ok else (
+                        f"{probe.get('error')}; delivery agent_running={agent_running} remote_reachable={remote_reachable}"
+                    ),
+                    "mode": "delivery",
+                    "agent_running": agent_running,
+                    "remote_store": settings.PARCA_REMOTE_STORE_ADDRESS,
+                    "remote_reachable": remote_reachable,
+                }
+        else:
+            probe = _probe_http(url)
+
+        probes.append(
+            {
+                "id": source_id,
+                "category": category,
+                "configured": True,
+                "url": url,
+                **probe,
+            }
+        )
+
+    available = sum(1 for probe in probes if probe.get("available"))
+    total = len(probes)
+    by_category: dict[str, dict[str, int]] = {}
+    for probe in probes:
+        category = probe["category"]
+        bucket = by_category.setdefault(category, {"total": 0, "available": 0})
+        bucket["total"] += 1
+        if probe.get("available"):
+            bucket["available"] += 1
+
+    percent = int((available / total) * 100) if total else 0
+
+    return {
+        "probes": probes,
+        "summary": {
+            "available": available,
+            "total": total,
+            "percent": percent,
+            "by_category": by_category,
+        },
+    }
+
+
 def _parse_trivy_summary(path: Path) -> dict:
     if not path.is_file():
         return {
@@ -522,7 +909,10 @@ def _git_commit() -> str | None:
 
 
 @router.get("/attestation/summary")
-async def attestation_summary():
+async def attestation_summary(
+    request: Request,
+    _: None = Depends(optional_api_auth),
+):
     trivy_reports = [
         _parse_trivy_summary(_resolve_report_path("trivy-backend.txt")),
         _parse_trivy_summary(_resolve_report_path("trivy-caddy.txt")),
@@ -584,9 +974,13 @@ async def attestation_summary():
     }
     runtime = _runtime_context()
     cloud = _cloud_context()
+    if not _is_authenticated(request):
+        cloud = _redact_cloud_context(cloud)
     evidence = _evidence_coverage(trivy_reports, sbom_reports)
     assets = _security_assets(trivy_reports, sbom_reports)
     wireguard = _wireguard_context()
+    sources = _source_attestation()
+    sidecars = _sidecar_attestation()
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -603,6 +997,8 @@ async def attestation_summary():
         "runtime": runtime,
         "cloud": cloud,
         "wireguard": wireguard,
+        "sources": sources,
+        "sidecars": sidecars,
         "evidence": evidence,
         "security": {
             "reports_dir": settings.SECURITY_REPORTS_DIR,
@@ -621,6 +1017,10 @@ async def attestation_summary():
             cloud=cloud,
             evidence=evidence,
         ) + ([
+            f"Runtime source coverage is {sources['summary']['available']}/{sources['summary']['total']} probes available ({sources['summary']['percent']}%)."
+        ] if sources["summary"]["total"] > 0 else []) + ([
+            f"Sidecar health is {sidecars['summary']['healthy']}/{sidecars['summary']['total']} healthy services ({sidecars['summary']['percent_healthy']}%)."
+        ] if sidecars["summary"]["total"] > 0 else []) + ([
             f"WireGuard interface {wireguard['interface']} is up with {wireguard['connected_peers']} live peers out of {wireguard['configured_peers']} configured."
         ] if wireguard["is_up"] else [
             f"WireGuard interface {wireguard['interface']} is not currently up from the API container view."

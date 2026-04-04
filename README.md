@@ -80,9 +80,10 @@ Create a `.env` file in the project root:
 
 ```env
 # Database
-DATABASE_URL=sqlite:///./wireguard.db
-# or for PostgreSQL:
-# DATABASE_URL=postgresql://user:password@localhost/wireguard
+POSTGRES_USER=wireguard
+POSTGRES_PASSWORD=<strong-password>
+POSTGRES_DB=wireguard
+DATABASE_URL=postgresql://wireguard:<strong-password>@127.0.0.1:5432/wireguard
 
 # WireGuard
 WG_INTERFACE=wg0
@@ -104,6 +105,10 @@ localStorage.setItem('apiToken', '<API_AUTH_TOKEN>')
 ```
 
 Public dashboard endpoints remain readable without authentication.
+
+Production compose now includes `postgres`, `node_exporter`, `podman_exporter`, and `postgres_exporter` services. The backend metrics summary probes these local endpoints and exposes availability in `/api/metrics/summary`.
+
+Low-memory mode is the default in deployment (`ENABLE_SECURITY_SIDECARS=false`), which starts only the core stack. Set `ENABLE_SECURITY_SIDECARS=true` in `.env` to additionally run Falco, Falcosidekick, CrowdSec, Trivy server, and eBPF sidecars.
 
 ## WireGuard Setup
 

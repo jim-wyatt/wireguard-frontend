@@ -252,17 +252,25 @@ PersistentKeepalive = 25
             return summary
 
         try:
-            result = subprocess.run(
-                ["wg", "show", self.interface, "listen-port", "public-key"],
+            listen_result = subprocess.run(
+                ["wg", "show", self.interface, "listen-port"],
                 capture_output=True,
                 text=True,
                 check=True,
             )
-            lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-            if len(lines) >= 1:
-                summary["listen_port"] = int(lines[0])
-            if len(lines) >= 2:
-                summary["public_key"] = lines[1]
+            listen_value = listen_result.stdout.strip()
+            if listen_value:
+                summary["listen_port"] = int(listen_value)
+
+            key_result = subprocess.run(
+                ["wg", "show", self.interface, "public-key"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            key_value = key_result.stdout.strip()
+            if key_value:
+                summary["public_key"] = key_value
         except (subprocess.CalledProcessError, ValueError):
             logger.warning("Failed to read WireGuard interface metadata", exc_info=True)
 

@@ -8,6 +8,7 @@ DEFAULT_INSECURE_SECRET = "change-this-secret-key"
 class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./wireguard.db"
+    POSTGRES_DB: str = "wireguard"
     
     # WireGuard
     WG_INTERFACE: str = "wg0"
@@ -20,6 +21,18 @@ class Settings(BaseSettings):
     WG_DNS: str = "1.1.1.1,8.8.8.8"
     CADDY_ACCESS_LOG_PATH: str = "/var/log/caddy/access.log"
     METRICS_ENDPOINT_URL: str = "http://127.0.0.1:2019/metrics"
+    NODE_EXPORTER_ENDPOINT_URL: str = "http://127.0.0.1:9100/metrics"
+    PODMAN_EXPORTER_ENDPOINT_URL: str = "http://127.0.0.1:9882/metrics"
+    POSTGRES_EXPORTER_ENDPOINT_URL: str = "http://127.0.0.1:9187/metrics"
+    PARCA_SERVER_ENDPOINT_URL: str = "http://127.0.0.1:7070"
+    EBPF_EXPORTER_ENDPOINT_URL: str = "http://127.0.0.1:9435/metrics"
+    PARCA_REMOTE_STORE_ADDRESS: str = "127.0.0.1:7070"
+    FALCOSIDEKICK_ENDPOINT_URL: str = "http://127.0.0.1:2801/metrics"
+    CROWDSEC_ENDPOINT_URL: str = "http://127.0.0.1:8080/health"
+    TRIVY_SERVER_ENDPOINT_URL: str = "http://127.0.0.1:4954/version"
+    WAZUH_API_ENDPOINT_URL: str = ""
+    FLEET_API_ENDPOINT_URL: str = ""
+    OSQUERY_EXPORTER_ENDPOINT_URL: str = ""
     APP_LOG_PATH: str = "/var/log/wg/backend.log"
     SYSTEM_LOG_PATH: str = "/host/var/log/syslog"
     SECURITY_REPORTS_DIR: str = "/app/docs/security"

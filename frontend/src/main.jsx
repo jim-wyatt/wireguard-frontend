@@ -11,12 +11,58 @@ function buildTheme(matrixMode) {
   if (!matrixMode) {
     return createTheme({
       palette: {
-        mode: 'light',
+        mode: 'dark',
         primary: {
-          main: '#1976d2',
+          main: '#31f27d',
         },
         secondary: {
-          main: '#dc004e',
+          main: '#19c7ff',
+        },
+        background: {
+          default: '#070b0d',
+          paper: '#0d1518',
+        },
+        text: {
+          primary: '#ddffe9',
+          secondary: '#8fb7a0',
+        },
+      },
+      shape: {
+        borderRadius: 4,
+      },
+      typography: {
+        fontFamily: '"VT323", "Share Tech Mono", "JetBrains Mono", monospace',
+        h4: {
+          letterSpacing: 1.2,
+        },
+      },
+      components: {
+        MuiCssBaseline: {
+          styleOverrides: {
+            body: {
+              backgroundImage: [
+                'linear-gradient(rgba(49,242,125,0.035) 1px, transparent 1px)',
+                'linear-gradient(90deg, rgba(49,242,125,0.03) 1px, transparent 1px)',
+                'radial-gradient(circle at 15% 20%, rgba(25,199,255,0.08), transparent 30%)',
+              ].join(','),
+              backgroundSize: '24px 24px, 24px 24px, 100% 100%',
+            },
+          },
+        },
+        MuiPaper: {
+          styleOverrides: {
+            root: {
+              border: '1px solid rgba(49, 242, 125, 0.22)',
+              boxShadow: 'inset 0 0 0 1px rgba(25,199,255,0.08), 0 0 12px rgba(49,242,125,0.06)',
+            },
+          },
+        },
+        MuiChip: {
+          styleOverrides: {
+            root: {
+              letterSpacing: 0.4,
+            },
+          },
         },
       },
     })
@@ -40,22 +86,31 @@ function buildTheme(matrixMode) {
         secondary: '#6ebd84',
       },
     },
+    shape: {
+      borderRadius: 4,
+    },
     typography: {
-      fontFamily: '"Fira Code", "JetBrains Mono", "Source Code Pro", monospace',
+      fontFamily: '"VT323", "Share Tech Mono", "Fira Code", "JetBrains Mono", monospace',
     },
     components: {
       MuiCssBaseline: {
         styleOverrides: {
           body: {
-            backgroundImage: 'radial-gradient(circle at 20% 10%, rgba(0,255,102,0.10), transparent 30%), radial-gradient(circle at 80% 90%, rgba(0,255,102,0.08), transparent 30%)',
+            backgroundImage: [
+              'linear-gradient(rgba(0,255,102,0.045) 1px, transparent 1px)',
+              'linear-gradient(90deg, rgba(0,255,102,0.03) 1px, transparent 1px)',
+              'radial-gradient(circle at 20% 10%, rgba(0,255,102,0.10), transparent 30%)',
+              'radial-gradient(circle at 80% 90%, rgba(0,255,102,0.08), transparent 30%)',
+            ].join(','),
+            backgroundSize: '24px 24px, 24px 24px, 100% 100%, 100% 100%',
           },
         },
       },
       MuiPaper: {
         styleOverrides: {
           root: {
-            border: '1px solid rgba(0, 255, 102, 0.15)',
-            boxShadow: '0 0 18px rgba(0, 255, 102, 0.08)',
+            border: '1px solid rgba(0, 255, 102, 0.2)',
+            boxShadow: 'inset 0 0 0 1px rgba(0,255,102,0.08), 0 0 18px rgba(0, 255, 102, 0.08)',
           },
         },
       },

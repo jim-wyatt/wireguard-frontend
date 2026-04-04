@@ -1,10 +1,12 @@
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 import logging
+import time
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.core.internal_metrics import internal_metrics
 from app.core.logging_config import configure_logging
 from app.api import clients
 from app.api import logs
@@ -60,6 +62,21 @@ def create_app() -> FastAPI:
     app.include_router(logs.router, prefix="/api", tags=["logs"])
     app.include_router(attestation.router, prefix="/api", tags=["attestation"])
     app.include_router(metrics.router, prefix="/api", tags=["metrics"])
+
+    @app.middleware("http")
+    async def capture_internal_metrics(request, call_next):
+        start = time.perf_counter()
+        internal_metrics.request_started()
+        try:
+            response = await call_next(request)
+        except Exception:
+            latency_ms = (time.perf_counter() - start) * 1000.0
+            internal_metrics.request_finished(status_code=500, latency_ms=latency_ms)
+            raise
+
+        latency_ms = (time.perf_counter() - start) * 1000.0
+        internal_metrics.request_finished(status_code=response.status_code, latency_ms=latency_ms)
+        return response
 
     @app.get("/")
     async def root():

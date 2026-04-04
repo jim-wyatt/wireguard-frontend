@@ -1,211 +1,203 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation, Outlet } from 'react-router-dom'
 import {
   AppBar,
+  Avatar,
   Box,
-  Toolbar,
-  Typography,
   IconButton,
-  Drawer,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Divider,
   Menu,
   MenuItem,
-  Avatar,
+  Paper,
+  Stack,
+  Toolbar,
   Tooltip,
+  Typography,
 } from '@mui/material'
-import MenuIcon from '@mui/icons-material/Menu'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import PeopleIcon from '@mui/icons-material/People'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import PolicyIcon from '@mui/icons-material/Policy'
 import QueryStatsIcon from '@mui/icons-material/QueryStats'
+import TerminalIcon from '@mui/icons-material/Terminal'
 import VpnKeyIcon from '@mui/icons-material/VpnKey'
 import LogoutIcon from '@mui/icons-material/Logout'
 import LoginIcon from '@mui/icons-material/Login'
 import DarkModeIcon from '@mui/icons-material/DarkMode'
 import LightModeIcon from '@mui/icons-material/LightMode'
-import ViewSidebarIcon from '@mui/icons-material/ViewSidebar'
 import { useAuth } from '../context/AuthContext'
 import { useUi } from '../context/UiContext'
 
-const drawerWidth = 240
-
 function Layout() {
-  const [mobileOpen, setMobileOpen] = useState(false)
   const [menuAnchor, setMenuAnchor] = useState(null)
+  const [dockVisible, setDockVisible] = useState(true)
   const navigate = useNavigate()
   const location = useLocation()
   const { isAuthenticated, logout } = useAuth()
-  const {
-    matrixMode,
-    sidebarVisible,
-    toggleMatrixMode,
-    toggleSidebarVisible,
-  } = useUi()
+  const { matrixMode, toggleMatrixMode } = useUi()
 
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen)
-  }
-
-  const handleMenuOpen = (e) => {
-    setMenuAnchor(e.currentTarget)
-  }
-
-  const handleMenuClose = () => {
-    setMenuAnchor(null)
-  }
-
-  const handleLogout = () => {
-    handleMenuClose()
-    logout()
-    navigate('/')
-  }
-
-  const handleLogin = () => {
-    handleMenuClose()
-    navigate('/login')
-  }
-
-  const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Clients', icon: <PeopleIcon />, path: '/clients' },
-    { text: 'Logs', icon: <ReceiptLongIcon />, path: '/logs' },
-    { text: 'Attestation', icon: <PolicyIcon />, path: '/attestation' },
-    { text: 'Metrics', icon: <QueryStatsIcon />, path: '/metrics' },
+  const navItems = [
+    { text: 'Dash', icon: <DashboardIcon fontSize="small" />, path: '/dashboard' },
+    { text: 'Clients', icon: <PeopleIcon fontSize="small" />, path: '/clients' },
+    { text: 'Logs', icon: <ReceiptLongIcon fontSize="small" />, path: '/logs' },
+    { text: 'Trust', icon: <PolicyIcon fontSize="small" />, path: '/attestation' },
+    { text: 'Metrics', icon: <QueryStatsIcon fontSize="small" />, path: '/metrics' },
+    { text: 'Ops', icon: <TerminalIcon fontSize="small" />, path: '/operations' },
   ]
 
-  const drawer = (
-    <div>
-      <Toolbar>
-        <VpnKeyIcon sx={{ mr: 1 }} />
-        <Typography variant="h6" noWrap>
-          WireGuard
-        </Typography>
-      </Toolbar>
-      <Divider />
-      <List>
-        {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding>
-            <ListItemButton
-              selected={location.pathname === item.path}
-              onClick={() => {
-                navigate(item.path)
-                setMobileOpen(false)
-              }}
-            >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
-    </div>
-  )
+  useEffect(() => {
+    const navHotkeys = {
+      '1': '/dashboard',
+      '2': '/clients',
+      '3': '/logs',
+      '4': '/attestation',
+      '5': '/metrics',
+      '6': '/operations',
+    }
+
+    const onKeydown = (event) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return
+      const target = event.target
+      const tag = target?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) return
+
+      const path = navHotkeys[event.key]
+      if (path) {
+        event.preventDefault()
+        navigate(path)
+      }
+    }
+
+    window.addEventListener('keydown', onKeydown)
+    return () => window.removeEventListener('keydown', onKeydown)
+  }, [navigate])
+
+  useEffect(() => {
+    let lastY = window.scrollY
+
+    const onScroll = () => {
+      const currentY = window.scrollY
+      const delta = currentY - lastY
+
+      // Keep dock visible near top; otherwise hide on downward scroll and show on upward scroll.
+      if (currentY < 48) {
+        setDockVisible(true)
+      } else if (delta > 6) {
+        setDockVisible(false)
+      } else if (delta < -6) {
+        setDockVisible(true)
+      }
+
+      lastY = currentY
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ minHeight: '100vh' }}>
       <AppBar
         position="fixed"
+        elevation={0}
         sx={{
-          width: { sm: sidebarVisible ? `calc(100% - ${drawerWidth}px)` : '100%' },
-          ml: { sm: sidebarVisible ? `${drawerWidth}px` : 0 },
+          top: 8,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 'min(1120px, calc(100% - 16px))',
+          borderRadius: 1,
+          bgcolor: 'background.paper',
+          color: 'text.primary',
+          border: '1px solid rgba(49, 242, 125, 0.24)',
+          backdropFilter: 'blur(6px)',
         }}
       >
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: 'none' } }}
-          >
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            WireGuard Management
-          </Typography>
-          <Tooltip title={sidebarVisible ? 'Hide sidebar' : 'Show sidebar'}>
-            <IconButton color="inherit" onClick={toggleSidebarVisible}>
-              <ViewSidebarIcon />
+        <Toolbar variant="dense" sx={{ minHeight: '42px !important' }}>
+          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexGrow: 1 }}>
+            <VpnKeyIcon sx={{ fontSize: 18 }} />
+            <Typography variant="subtitle2">WIREGUARD OPS HUD</Typography>
+            <Typography variant="caption" color="text.secondary">| HOTKEYS 1-6</Typography>
+            <Typography variant="caption" color="text.secondary">| PAGE {location.pathname}</Typography>
+          </Stack>
+
+          <Tooltip title={matrixMode ? 'switch light mode' : 'switch matrix mode'}>
+            <IconButton size="small" color="inherit" onClick={toggleMatrixMode}>
+              {matrixMode ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
             </IconButton>
           </Tooltip>
-          <Tooltip title={matrixMode ? 'Switch to light mode' : 'Switch to Matrix mode'}>
-            <IconButton color="inherit" onClick={toggleMatrixMode}>
-              {matrixMode ? <LightModeIcon /> : <DarkModeIcon />}
-            </IconButton>
-          </Tooltip>
-          <IconButton
-            color="inherit"
-            onClick={handleMenuOpen}
-          >
-            <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
-              A
-            </Avatar>
+
+          <IconButton color="inherit" size="small" onClick={(e) => setMenuAnchor(e.currentTarget)}>
+            <Avatar sx={{ width: 26, height: 26, bgcolor: 'secondary.main', fontSize: 12 }}>A</Avatar>
           </IconButton>
-          <Menu
-            anchorEl={menuAnchor}
-            open={Boolean(menuAnchor)}
-            onClose={handleMenuClose}
-          >
+          <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
             {isAuthenticated ? (
-              <MenuItem onClick={handleLogout}>
-                <LogoutIcon sx={{ mr: 1 }} />
+              <MenuItem onClick={() => {
+                setMenuAnchor(null)
+                logout()
+                navigate('/')
+              }}>
+                <LogoutIcon sx={{ mr: 1 }} fontSize="small" />
                 Logout
               </MenuItem>
             ) : (
-              <MenuItem onClick={handleLogin}>
-                <LoginIcon sx={{ mr: 1 }} />
+              <MenuItem onClick={() => {
+                setMenuAnchor(null)
+                navigate('/login')
+              }}>
+                <LoginIcon sx={{ mr: 1 }} fontSize="small" />
                 Login
               </MenuItem>
             )}
           </Menu>
         </Toolbar>
       </AppBar>
-      <Box
-        component="nav"
-        sx={{ width: { sm: sidebarVisible ? drawerWidth : 0 }, flexShrink: { sm: 0 } }}
-      >
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true,
-          }}
-          sx={{
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
-          }}
-        >
-          {drawer}
-        </Drawer>
-        <Drawer
-          variant="permanent"
-          sx={{
-            display: { xs: 'none', sm: sidebarVisible ? 'block' : 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
-          }}
-          open
-        >
-          {drawer}
-        </Drawer>
-      </Box>
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          p: 3,
-          width: { sm: sidebarVisible ? `calc(100% - ${drawerWidth}px)` : '100%' },
-        }}
-      >
-        <Toolbar />
+
+      <Box component="main" sx={{ px: 1.5, pt: 7.5, pb: 9.5 }}>
         <Outlet />
       </Box>
+
+      <Paper
+        sx={{
+          position: 'fixed',
+          bottom: 10,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 'min(840px, calc(100% - 24px))',
+          p: 0.7,
+          zIndex: (theme) => theme.zIndex.appBar + 1,
+          borderRadius: 1,
+          bgcolor: 'background.paper',
+          border: '1px solid rgba(49, 242, 125, 0.28)',
+          opacity: dockVisible ? 1 : 0,
+          pointerEvents: dockVisible ? 'auto' : 'none',
+          transition: 'opacity 160ms ease',
+        }}
+      >
+        <Stack direction="row" spacing={0.5} justifyContent="space-between" useFlexGap>
+          {navItems.map((item) => {
+            const active = location.pathname === item.path
+            return (
+              <Tooltip key={item.path} title={`${item.text} (${navItems.indexOf(item) + 1})`}>
+                <IconButton
+                  size="small"
+                  onClick={() => navigate(item.path)}
+                  sx={{
+                    px: 1.15,
+                    py: 0.45,
+                    borderRadius: 1,
+                    border: active ? '1px solid rgba(49,242,125,0.45)' : '1px solid transparent',
+                    bgcolor: active ? 'rgba(49,242,125,0.12)' : 'transparent',
+                  }}
+                >
+                  <Stack direction="row" spacing={0.45} alignItems="center">
+                    {item.icon}
+                    <Typography variant="caption">{item.text}</Typography>
+                  </Stack>
+                </IconButton>
+              </Tooltip>
+            )
+          })}
+        </Stack>
+      </Paper>
     </Box>
   )
 }

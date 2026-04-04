@@ -90,7 +90,6 @@ source .env
 # Validate required variables
 REQUIRED_VARS=(
     "DOMAIN"
-    "DATABASE_URL"
     "WG_SERVER_PUBLIC_KEY"
     "WG_SERVER_PRIVATE_KEY"
     "WG_SERVER_ENDPOINT"
@@ -103,6 +102,35 @@ for var in "${REQUIRED_VARS[@]}"; do
         exit 1
     fi
 done
+
+if [ -z "${POSTGRES_PASSWORD:-}" ]; then
+    if command -v openssl >/dev/null 2>&1; then
+        export POSTGRES_PASSWORD="$(openssl rand -hex 20)"
+    else
+        export POSTGRES_PASSWORD="$(date +%s%N | sha256sum | head -c 40)"
+    fi
+    echo "POSTGRES_PASSWORD not set; generated a deployment password and persisting it to .env"
+    printf '\nPOSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD" >> .env
+fi
+
+if [ -z "${POSTGRES_USER:-}" ]; then
+    export POSTGRES_USER="wireguard"
+fi
+
+if [ -z "${POSTGRES_DB:-}" ]; then
+    export POSTGRES_DB="wireguard"
+fi
+
+if [ -z "${DATABASE_URL:-}" ] || [[ "${DATABASE_URL}" == sqlite* ]]; then
+    export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB}"
+    echo "Using PostgreSQL database URL derived from POSTGRES_* settings"
+
+    if grep -q '^DATABASE_URL=' .env; then
+        sed -i "s|^DATABASE_URL=.*|DATABASE_URL=${DATABASE_URL}|" .env
+    else
+        printf '\nDATABASE_URL=%s\n' "$DATABASE_URL" >> .env
+    fi
+fi
 
 echo "Building frontend..."
 chmod +x "$SCRIPT_DIR/ensure-node-lts.sh"
@@ -118,7 +146,17 @@ echo "Recreating existing services to apply newly built images..."
 cleanup_rootless_stack
 "${COMPOSE_CMD[@]}" -f compose.prod.yml down
 stop_orphaned_backend_listener
-"${COMPOSE_CMD[@]}" -f compose.prod.yml up -d --build
+ENABLE_SECURITY_SIDECARS="${ENABLE_SECURITY_SIDECARS:-false}"
+
+SERVICE_LIST=(db node_exporter podman_exporter postgres_exporter backend caddy)
+if [ "$ENABLE_SECURITY_SIDECARS" = "true" ]; then
+    SERVICE_LIST+=(falco falcosidekick crowdsec trivy_server parca ebpf_agent)
+    echo "Security sidecars enabled: deploying full security stack"
+else
+    echo "Security sidecars disabled: deploying low-memory core stack"
+fi
+
+"${COMPOSE_CMD[@]}" -f compose.prod.yml up -d --build "${SERVICE_LIST[@]}"
 "${COMPOSE_CMD[@]}" -f compose.prod.yml restart backend
 
 echo ""

@@ -66,13 +66,13 @@ export const clientsApi = {
   toggleClientStatus: (id) => api.patch(`/clients/${id}/toggle`),
 
   // Stream log lines from a selected source.
-  streamLogs: async ({ signal, source = 'caddy', tail = 100, onLine }) => {
+  streamLogs: async ({ signal, source = 'caddy', tail = 100, follow = true, onLine }) => {
     const token = (window.localStorage.getItem('apiToken') || '').trim();
     const headers = token
       ? { Authorization: `Bearer ${token}` }
       : {};
 
-    const response = await fetch(`${API_BASE_URL}/logs/stream?source=${encodeURIComponent(source)}&tail=${tail}&_ts=${Date.now()}`, {
+    const response = await fetch(`${API_BASE_URL}/logs/stream?source=${encodeURIComponent(source)}&tail=${tail}&follow=${follow ? 'true' : 'false'}&_ts=${Date.now()}`, {
       method: 'GET',
       headers,
       cache: 'no-store',

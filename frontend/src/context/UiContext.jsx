@@ -12,7 +12,7 @@ function readBool(key, fallback) {
 }
 
 export function UiProvider({ children }) {
-  const [matrixMode, setMatrixMode] = useState(() => readBool(MATRIX_MODE_KEY, false))
+  const [matrixMode, setMatrixMode] = useState(() => readBool(MATRIX_MODE_KEY, true))
   const [sidebarVisible, setSidebarVisible] = useState(() => readBool(SIDEBAR_VISIBLE_KEY, true))
 
   const toggleMatrixMode = () => {
