@@ -120,6 +120,15 @@ export const clientsApi = {
       Pragma: 'no-cache',
     },
   }),
+
+  // Prometheus metrics summary from backend proxy.
+  getMetricsSummary: () => api.get('/metrics/summary', {
+    params: { _ts: Date.now() },
+    headers: {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+  }),
 };
 
 export default api;

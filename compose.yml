@@ -18,7 +18,11 @@ services:
   backend:
     build:
       context: ./backend
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     environment:
+      GIT_COMMIT: ${GIT_COMMIT:-unknown}
+      APP_VERSION: ${APP_VERSION:-1.0.0}
       DATABASE_URL: postgresql://${POSTGRES_USER:-wireguard}:${POSTGRES_PASSWORD:-changeme}@127.0.0.1:5432/${POSTGRES_DB:-wireguard}
       WG_INTERFACE: ${WG_INTERFACE:-wg0}
       WG_SERVER_IP: ${WG_SERVER_IP:-10.0.0.1}
@@ -29,6 +33,7 @@ services:
       WG_NETWORK: ${WG_NETWORK:-10.0.0.0/24}
       WG_DNS: ${WG_DNS:-1.1.1.1,8.8.8.8}
       API_SECRET_KEY: ${API_SECRET_KEY}
+      METRICS_ENDPOINT_URL: ${METRICS_ENDPOINT_URL:-http://127.0.0.1:2019/metrics}
       APP_LOG_PATH: /var/log/wg/backend.log
       SYSTEM_LOG_PATH: /host/var/log/dpkg.log
       CORS_ORIGINS: '["https://${DOMAIN}","http://localhost:5173"]'

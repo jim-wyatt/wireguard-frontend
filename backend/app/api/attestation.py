@@ -12,9 +12,8 @@ from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
-from app.core.auth import require_writer_role
 from app.core.config import settings
 from app.services.wireguard import wireguard_service
 
@@ -105,7 +104,7 @@ def _aws_metadata_token() -> str | None:
         headers={"X-aws-ec2-metadata-token-ttl-seconds": "60"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=0.2) as response:
+        with urllib.request.urlopen(request, timeout=1.0) as response:
             return response.read().decode("utf-8").strip() or None
     except Exception:
         return None
@@ -116,7 +115,7 @@ def _aws_metadata(path: str, token: str | None) -> str | None:
     if token:
         request.add_header("X-aws-ec2-metadata-token", token)
     try:
-        with urllib.request.urlopen(request, timeout=0.2) as response:
+        with urllib.request.urlopen(request, timeout=1.0) as response:
             return response.read().decode("utf-8").strip() or None
     except Exception:
         return None
@@ -135,7 +134,11 @@ def _cloud_context() -> dict:
         pass
 
     looks_like_aws = any([aws_region, execution_env, ecs_metadata, lambda_name]) or hypervisor_uuid.startswith("ec2")
-    token = _aws_metadata_token() if looks_like_aws else None
+
+    # Probe IMDS directly so EC2 can be detected even when AWS env hints are absent.
+    token = _aws_metadata_token()
+    token_instance_id = _aws_metadata("meta-data/instance-id", token) if token else None
+    unauth_instance_id = _aws_metadata("meta-data/instance-id", None)
     identity_document = None
     if token:
         identity_raw = _aws_metadata("dynamic/instance-identity/document", token)
@@ -145,21 +148,62 @@ def _cloud_context() -> dict:
             except json.JSONDecodeError:
                 identity_document = None
 
-    provider = "aws" if looks_like_aws or identity_document else None
-    region = aws_region or (identity_document or {}).get("region")
-    availability_zone = (identity_document or {}).get("availabilityZone")
-    instance_id = (identity_document or {}).get("instanceId")
-    instance_type = (identity_document or {}).get("instanceType")
+    metadata_token = token
+
+    ami_id = _aws_metadata("meta-data/ami-id", metadata_token) if metadata_token else None
+    private_ipv4 = _aws_metadata("meta-data/local-ipv4", metadata_token) if metadata_token else None
+    role_listing = _aws_metadata("meta-data/iam/security-credentials/", metadata_token) if metadata_token else None
+    iam_role_name = role_listing.splitlines()[0].strip() if role_listing else None
+
+    iam_profile_arn = None
+    if metadata_token:
+        iam_info_raw = _aws_metadata("meta-data/iam/info", metadata_token)
+        if iam_info_raw:
+            try:
+                iam_profile_arn = json.loads(iam_info_raw).get("InstanceProfileArn")
+            except json.JSONDecodeError:
+                iam_profile_arn = None
+
+    vpc_id = None
+    subnet_id = None
+    if metadata_token:
+        macs_raw = _aws_metadata("meta-data/network/interfaces/macs/", metadata_token)
+        if macs_raw:
+            first_mac = macs_raw.splitlines()[0].strip()
+            if first_mac:
+                if not first_mac.endswith("/"):
+                    first_mac = f"{first_mac}/"
+                vpc_id = _aws_metadata(f"meta-data/network/interfaces/macs/{first_mac}vpc-id", metadata_token)
+                subnet_id = _aws_metadata(f"meta-data/network/interfaces/macs/{first_mac}subnet-id", metadata_token)
+
+    region_from_imds = _aws_metadata("meta-data/placement/region", metadata_token) if metadata_token else None
+    az_from_imds = _aws_metadata("meta-data/placement/availability-zone", metadata_token) if metadata_token else None
+    instance_type_from_imds = _aws_metadata("meta-data/instance-type", metadata_token) if metadata_token else None
+
+    provider = "aws" if any([looks_like_aws, identity_document, token_instance_id, unauth_instance_id]) else None
+    region = aws_region or (identity_document or {}).get("region") or region_from_imds
+    availability_zone = (identity_document or {}).get("availabilityZone") or az_from_imds
+    instance_id = (identity_document or {}).get("instanceId") or token_instance_id or unauth_instance_id
+    instance_type = (identity_document or {}).get("instanceType") or instance_type_from_imds
     account_id = (identity_document or {}).get("accountId")
 
     return {
         "provider": provider,
         "detected": bool(provider),
+        "metadata_reachable": bool(token_instance_id or unauth_instance_id),
+        "imdsv2_required": bool(token and token_instance_id and not unauth_instance_id),
         "region": region,
         "availability_zone": availability_zone,
         "instance_id": instance_id,
         "instance_type": instance_type,
+        "ami_id": ami_id,
+        "private_ipv4": private_ipv4,
+        "vpc_id": vpc_id,
+        "subnet_id": subnet_id,
         "account_id": account_id,
+        "iam_role_attached": bool(iam_role_name),
+        "iam_role_name": iam_role_name,
+        "iam_instance_profile_arn": iam_profile_arn,
         "execution_env": execution_env,
         "ecs_metadata": bool(ecs_metadata),
         "lambda_function": lambda_name,
@@ -270,7 +314,7 @@ def _evidence_coverage(trivy_reports: list[dict], sbom_reports: list[dict]) -> d
     }
 
 
-def _insights(*, totals: dict, auth: dict, log_sources: dict, runtime: dict, cloud: dict, evidence: dict) -> list[str]:
+def _insights(*, totals: dict, remediation: dict, auth: dict, log_sources: dict, runtime: dict, cloud: dict, evidence: dict) -> list[str]:
     insights: list[str] = []
 
     if totals["critical"] > 0:
@@ -290,6 +334,14 @@ def _insights(*, totals: dict, auth: dict, log_sources: dict, runtime: dict, clo
         insights.append(f"AWS environment detected with region context {region}.")
     if evidence["combined"]["percent"] == 100:
         insights.append("Security evidence coverage is complete for the tracked assets: scans and SBOMs are present for each one.")
+    if remediation["upgradeable"]["total"] > 0:
+        insights.append(
+            f"{remediation['upgradeable']['total']} open-source findings have an upgrade path with fixed versions available."
+        )
+    if remediation["actionable"]["total"] > 0:
+        insights.append(
+            f"{remediation['actionable']['total']} findings are still actionable after accounting for fixed-status advisories."
+        )
 
     return insights
 
@@ -322,9 +374,72 @@ def _parse_trivy_summary(path: Path) -> dict:
             "total": 0,
             "high": 0,
             "critical": 0,
+            "status": {"affected": 0, "fixed": 0, "other": 0},
+            "actionable": {"total": 0, "high": 0, "critical": 0},
+            "upgradeable": {"total": 0, "high": 0, "critical": 0},
+            "patch_available_unpatched": {"total": 0, "high": 0, "critical": 0},
+            "no_patch_available": {"total": 0, "high": 0, "critical": 0},
         }
 
     text = path.read_text(encoding="utf-8", errors="replace")
+
+    findings: list[dict] = []
+    for line in text.splitlines():
+        match = re.search(
+            r"│\s*[^│]+\s*│\s*(CVE-[^│]+)\s*│\s*(UNKNOWN|LOW|MEDIUM|HIGH|CRITICAL)\s*│\s*([a-z_]+)\s*│\s*[^│]*│\s*([^│]*)\s*│",
+            line,
+            re.IGNORECASE,
+        )
+        if not match:
+            continue
+        _, severity, status, fixed_version = match.groups()
+        findings.append(
+            {
+                "severity": severity.upper(),
+                "status": status.lower(),
+                "fixed_version": fixed_version.strip(),
+            }
+        )
+
+    status_counts = {
+        "affected": sum(1 for finding in findings if finding["status"] == "affected"),
+        "fixed": sum(1 for finding in findings if finding["status"] == "fixed"),
+        "other": sum(1 for finding in findings if finding["status"] not in {"affected", "fixed"}),
+    }
+
+    actionable_findings = [finding for finding in findings if finding["status"] != "fixed"]
+    upgradeable_findings = [finding for finding in findings if bool(finding["fixed_version"])]
+    patch_available_unpatched_findings = [
+        finding
+        for finding in findings
+        if finding["status"] != "fixed" and bool(finding["fixed_version"])
+    ]
+    no_patch_available_findings = [
+        finding
+        for finding in findings
+        if finding["status"] != "fixed" and not bool(finding["fixed_version"])
+    ]
+
+    actionable = {
+        "total": len(actionable_findings),
+        "high": sum(1 for finding in actionable_findings if finding["severity"] == "HIGH"),
+        "critical": sum(1 for finding in actionable_findings if finding["severity"] == "CRITICAL"),
+    }
+    upgradeable = {
+        "total": len(upgradeable_findings),
+        "high": sum(1 for finding in upgradeable_findings if finding["severity"] == "HIGH"),
+        "critical": sum(1 for finding in upgradeable_findings if finding["severity"] == "CRITICAL"),
+    }
+    patch_available_unpatched = {
+        "total": len(patch_available_unpatched_findings),
+        "high": sum(1 for finding in patch_available_unpatched_findings if finding["severity"] == "HIGH"),
+        "critical": sum(1 for finding in patch_available_unpatched_findings if finding["severity"] == "CRITICAL"),
+    }
+    no_patch_available = {
+        "total": len(no_patch_available_findings),
+        "high": sum(1 for finding in no_patch_available_findings if finding["severity"] == "HIGH"),
+        "critical": sum(1 for finding in no_patch_available_findings if finding["severity"] == "CRITICAL"),
+    }
 
     total_match = re.search(r"Total:\s*(\d+)\s*\(HIGH:\s*(\d+),\s*CRITICAL:\s*(\d+)\)", text)
     if total_match:
@@ -335,6 +450,11 @@ def _parse_trivy_summary(path: Path) -> dict:
             "total": int(total),
             "high": int(high),
             "critical": int(critical),
+            "status": status_counts,
+            "actionable": actionable,
+            "upgradeable": upgradeable,
+            "patch_available_unpatched": patch_available_unpatched,
+            "no_patch_available": no_patch_available,
         }
 
     return {
@@ -343,6 +463,11 @@ def _parse_trivy_summary(path: Path) -> dict:
         "total": 0,
         "high": 0,
         "critical": 0,
+        "status": status_counts,
+        "actionable": actionable,
+        "upgradeable": upgradeable,
+        "patch_available_unpatched": patch_available_unpatched,
+        "no_patch_available": no_patch_available,
     }
 
 
@@ -397,7 +522,7 @@ def _git_commit() -> str | None:
 
 
 @router.get("/attestation/summary")
-async def attestation_summary(_: None = Depends(require_writer_role)):
+async def attestation_summary():
     trivy_reports = [
         _parse_trivy_summary(_resolve_report_path("trivy-backend.txt")),
         _parse_trivy_summary(_resolve_report_path("trivy-caddy.txt")),
@@ -416,7 +541,34 @@ async def attestation_summary(_: None = Depends(require_writer_role)):
         "vulnerabilities": total_vulns,
         "high": total_high,
         "critical": total_critical,
-        "remediated": 0,
+        "remediated": sum(report["status"]["fixed"] for report in trivy_reports),
+    }
+    remediation = {
+        "status": {
+            "affected": sum(report["status"]["affected"] for report in trivy_reports),
+            "fixed": sum(report["status"]["fixed"] for report in trivy_reports),
+            "other": sum(report["status"]["other"] for report in trivy_reports),
+        },
+        "actionable": {
+            "total": sum(report["actionable"]["total"] for report in trivy_reports),
+            "high": sum(report["actionable"]["high"] for report in trivy_reports),
+            "critical": sum(report["actionable"]["critical"] for report in trivy_reports),
+        },
+        "upgradeable": {
+            "total": sum(report["upgradeable"]["total"] for report in trivy_reports),
+            "high": sum(report["upgradeable"]["high"] for report in trivy_reports),
+            "critical": sum(report["upgradeable"]["critical"] for report in trivy_reports),
+        },
+        "patch_available_unpatched": {
+            "total": sum(report["patch_available_unpatched"]["total"] for report in trivy_reports),
+            "high": sum(report["patch_available_unpatched"]["high"] for report in trivy_reports),
+            "critical": sum(report["patch_available_unpatched"]["critical"] for report in trivy_reports),
+        },
+        "no_patch_available": {
+            "total": sum(report["no_patch_available"]["total"] for report in trivy_reports),
+            "high": sum(report["no_patch_available"]["high"] for report in trivy_reports),
+            "critical": sum(report["no_patch_available"]["critical"] for report in trivy_reports),
+        },
     }
     auth = {
         "token_grants_configured": bool((settings.API_AUTH_TOKENS_JSON or "").strip()),
@@ -440,7 +592,7 @@ async def attestation_summary(_: None = Depends(require_writer_role)):
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "service": {
             "name": "wireguard-management-api",
-            "version": "1.0.0",
+            "version": settings.APP_VERSION,
             "git_commit": _git_commit(),
             "fastapi_version": _safe_version("fastapi"),
             "sqlalchemy_version": _safe_version("sqlalchemy"),
@@ -458,9 +610,11 @@ async def attestation_summary(_: None = Depends(require_writer_role)):
             "sbom": sbom_reports,
             "assets": assets,
             "totals": totals,
+            "remediation": remediation,
         },
         "insights": _insights(
             totals=totals,
+            remediation=remediation,
             auth=auth,
             log_sources=log_sources,
             runtime=runtime,

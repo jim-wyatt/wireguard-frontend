@@ -2,6 +2,9 @@ FROM docker.io/library/python:3.12.13-slim-trixie
 
 WORKDIR /app
 
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=${GIT_COMMIT}
+
 # Install WireGuard tools
 RUN apt-get update && \
     apt-get install -y --no-install-recommends wireguard-tools iproute2 && \

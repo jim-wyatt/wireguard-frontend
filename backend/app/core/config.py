@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     WG_NETWORK: str = "10.0.0.0/24"
     WG_DNS: str = "1.1.1.1,8.8.8.8"
     CADDY_ACCESS_LOG_PATH: str = "/var/log/caddy/access.log"
+    METRICS_ENDPOINT_URL: str = "http://127.0.0.1:2019/metrics"
     APP_LOG_PATH: str = "/var/log/wg/backend.log"
     SYSTEM_LOG_PATH: str = "/host/var/log/syslog"
     SECURITY_REPORTS_DIR: str = "/app/docs/security"
@@ -36,6 +37,7 @@ class Settings(BaseSettings):
     AUTH_FAIL_BLOCK_SECONDS: int = 300
     ENABLE_API_DOCS: bool = False
     WG_CONNECTED_TIMEOUT_SECONDS: int = 120  # Mobile peers can miss keepalives briefly; allow a 2-minute window
+    APP_VERSION: str = "1.0.0"
 
     def cors_origins_list(self) -> List[str]:
         raw = (self.CORS_ORIGINS or "").strip()

@@ -9,6 +9,7 @@ import {
   Container,
   Button,
   Paper,
+  Stack,
 } from '@mui/material'
 import PeopleIcon from '@mui/icons-material/People'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
@@ -112,6 +113,20 @@ function PublicDashboard() {
         <Button variant="contained" component={RouterLink} to="/login">
           Login
         </Button>
+      </Paper>
+
+      <Paper sx={{ p: 3, mt: 3 }}>
+        <Typography variant="h6" sx={{ mb: 1 }}>Browse Public Pages</Typography>
+        <Typography color="text.secondary" sx={{ mb: 2 }}>
+          These pages are readable without authentication.
+        </Typography>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} useFlexGap flexWrap="wrap">
+          <Button variant="outlined" component={RouterLink} to="/dashboard">Dashboard</Button>
+          <Button variant="outlined" component={RouterLink} to="/clients">Clients</Button>
+          <Button variant="outlined" component={RouterLink} to="/logs">Logs</Button>
+          <Button variant="outlined" component={RouterLink} to="/attestation">Attestation</Button>
+          <Button variant="outlined" component={RouterLink} to="/metrics">Metrics</Button>
+        </Stack>
       </Paper>
     </Container>
   )

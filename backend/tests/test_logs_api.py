@@ -1,12 +1,12 @@
 from app.core.config import settings
 
 
-def test_log_stream_requires_authentication(unauthenticated_client):
+def test_log_stream_is_public(unauthenticated_client):
     response = unauthenticated_client.get("/api/logs/caddy/access/stream")
-    assert response.status_code == 401
+    assert response.status_code in {200, 404}
 
     response = unauthenticated_client.get("/api/logs/stream")
-    assert response.status_code == 401
+    assert response.status_code in {200, 404}
 
 
 def test_log_stream_returns_404_when_file_missing(client, monkeypatch):

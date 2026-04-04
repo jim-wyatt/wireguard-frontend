@@ -18,8 +18,10 @@ import ToggleOnIcon from '@mui/icons-material/ToggleOn'
 import CreateClientDialog from '../components/CreateClientDialog'
 import ClientConfigDialog from '../components/ClientConfigDialog'
 import { clientsApi } from '../services/api'
+import { useAuth } from '../context/AuthContext'
 
 function Clients() {
+  const { isAuthenticated } = useAuth()
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -53,6 +55,10 @@ function Clients() {
   }
 
   const handleDelete = async (id) => {
+    if (!isAuthenticated) {
+      showSnackbar('Login required for client management actions', 'warning')
+      return
+    }
     if (!confirm('Are you sure you want to delete this client?')) return
 
     try {
@@ -65,6 +71,10 @@ function Clients() {
   }
 
   const handleToggle = async (id) => {
+    if (!isAuthenticated) {
+      showSnackbar('Login required for client management actions', 'warning')
+      return
+    }
     try {
       await clientsApi.toggleClientStatus(id)
       loadClients()
@@ -75,6 +85,10 @@ function Clients() {
   }
 
   const handleShowConfig = (client) => {
+    if (!isAuthenticated) {
+      showSnackbar('Login required to download client configuration', 'warning')
+      return
+    }
     setSelectedClient(client)
     setConfigDialogOpen(true)
   }
@@ -91,7 +105,7 @@ function Clients() {
       headerName: 'Name',
       flex: 0.7,
       minWidth: 150,
-      valueGetter: (params) => params.row.name || '-',
+      renderCell: (params) => params.row?.name || '-',
     },
     {
       field: 'ip_address',
@@ -120,7 +134,12 @@ function Clients() {
       headerName: 'Created',
       flex: 0.7,
       minWidth: 180,
-      valueGetter: (params) => new Date(params.row.created_at).toLocaleString(),
+      renderCell: (params) => {
+        const createdAt = params.row?.created_at
+        if (!createdAt) return '-'
+        const parsed = new Date(createdAt)
+        return Number.isNaN(parsed.getTime()) ? '-' : parsed.toLocaleString()
+      },
     },
     {
       field: 'config_downloaded',
@@ -148,6 +167,7 @@ function Clients() {
             size="small"
             onClick={() => handleShowConfig(params.row)}
             title="Download Config"
+            disabled={!isAuthenticated}
           >
             <DownloadIcon />
           </IconButton>
@@ -155,6 +175,7 @@ function Clients() {
             size="small"
             onClick={() => handleToggle(params.row.id)}
             title={params.row.is_active ? 'Deactivate' : 'Activate'}
+            disabled={!isAuthenticated}
           >
             {params.row.is_active ? <ToggleOnIcon color="success" /> : <ToggleOffIcon />}
           </IconButton>
@@ -163,6 +184,7 @@ function Clients() {
             onClick={() => handleDelete(params.row.id)}
             title="Delete"
             color="error"
+            disabled={!isAuthenticated}
           >
             <DeleteIcon />
           </IconButton>
@@ -180,20 +202,29 @@ function Clients() {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
+          disabled={!isAuthenticated}
           onClick={() => setCreateDialogOpen(true)}
         >
           Create Client
         </Button>
       </Box>
 
+      {!isAuthenticated && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Public mode: client identities are redacted. Login is required to create, modify, or download client configurations.
+        </Alert>
+      )}
+
       <Paper sx={{ height: 600, width: '100%' }}>
         <DataGrid
           rows={clients}
           columns={columns}
           loading={loading}
-          pageSize={10}
-          rowsPerPageOptions={[10, 25, 50]}
-          disableSelectionOnClick
+          initialState={{
+            pagination: { paginationModel: { pageSize: 10, page: 0 } },
+          }}
+          pageSizeOptions={[10, 25, 50]}
+          disableRowSelectionOnClick
           sx={{
             border: 0,
             '& .MuiDataGrid-cell:focus': {

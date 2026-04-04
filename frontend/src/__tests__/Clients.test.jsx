@@ -10,6 +10,10 @@ vi.mock('../services/api', () => ({
   },
 }))
 
+vi.mock('../context/AuthContext', () => ({
+  useAuth: () => ({ isAuthenticated: true }),
+}))
+
 vi.mock('../components/CreateClientDialog', () => ({
   default: ({ open }) => (open ? <div data-testid="create-client-dialog">Create Dialog</div> : null),
 }))

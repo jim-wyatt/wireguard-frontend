@@ -1,6 +1,6 @@
-def test_attestation_summary_requires_authentication(unauthenticated_client):
+def test_attestation_summary_is_public(unauthenticated_client):
     response = unauthenticated_client.get("/api/attestation/summary")
-    assert response.status_code == 401
+    assert response.status_code == 200
 
 
 def test_attestation_summary_returns_security_totals(client, monkeypatch, tmp_path):
@@ -27,6 +27,7 @@ def test_attestation_summary_returns_security_totals(client, monkeypatch, tmp_pa
 
     monkeypatch.setenv("GIT_COMMIT", "abc123")
     monkeypatch.setattr("app.api.attestation.settings.SECURITY_REPORTS_DIR", str(reports_dir))
+    monkeypatch.setattr("app.api.attestation.settings.APP_VERSION", "1.42+abc1234")
     monkeypatch.setattr(
         "app.api.attestation._runtime_context",
         lambda: {
@@ -87,6 +88,7 @@ def test_attestation_summary_returns_security_totals(client, monkeypatch, tmp_pa
     assert response.status_code == 200
 
     payload = response.json()
+    assert payload["service"]["version"] == "1.42+abc1234"
     assert payload["service"]["git_commit"] == "abc123"
     assert payload["security"]["totals"] == {
         "vulnerabilities": 16,

@@ -180,3 +180,18 @@ async def require_writer_role(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Writer role required",
         )
+
+
+async def optional_api_auth(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+) -> None:
+    """Best-effort auth for public endpoints; never raises on missing/invalid creds."""
+    provided = (x_api_key or _extract_bearer_token(authorization) or "").strip()
+    if not provided:
+        return
+
+    matched_grant = _match_token_grant(provided)
+    if matched_grant:
+        request.state.auth_role = matched_grant.role.value

@@ -22,7 +22,7 @@ def test_writer_role_token_can_access_writer_routes(client, monkeypatch):
     assert response.status_code == 200
 
 
-def test_public_role_token_cannot_access_writer_routes(client, monkeypatch):
+def test_public_role_token_can_access_read_routes(client, monkeypatch):
     _set_tokens(
         monkeypatch,
         [{"token": "public-token", "role": "public"}],
@@ -31,6 +31,20 @@ def test_public_role_token_cannot_access_writer_routes(client, monkeypatch):
     response = client.get(
         "/api/clients",
         headers={"Authorization": "Bearer public-token"},
+    )
+    assert response.status_code == 200
+
+
+def test_public_role_token_cannot_access_writer_routes(client, monkeypatch):
+    _set_tokens(
+        monkeypatch,
+        [{"token": "public-token", "role": "public"}],
+    )
+
+    response = client.post(
+        "/api/clients",
+        headers={"Authorization": "Bearer public-token"},
+        json={"email": "blocked@example.com", "name": "Blocked"},
     )
     assert response.status_code == 403
     assert response.json()["detail"] == "Writer role required"

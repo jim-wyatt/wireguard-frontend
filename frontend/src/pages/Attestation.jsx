@@ -24,9 +24,11 @@ import FactCheckIcon from '@mui/icons-material/FactCheck'
 import VpnLockIcon from '@mui/icons-material/VpnLock'
 import { clientsApi } from '../services/api'
 
-function scoreFromTotals(totals) {
-  const high = totals?.high || 0
-  const critical = totals?.critical || 0
+function scoreFromSecurity(security) {
+  const actionable = security?.remediation?.actionable || {}
+  const totals = security?.totals || {}
+  const high = actionable?.high ?? totals?.high ?? 0
+  const critical = actionable?.critical ?? totals?.critical ?? 0
   const penalty = Math.min(95, critical * 20 + high * 5)
   return Math.max(0, 100 - penalty)
 }
@@ -85,10 +87,16 @@ function Attestation() {
   }, [])
 
   const totals = data?.security?.totals || {}
-  const score = scoreFromTotals(totals)
+  const remediation = data?.security?.remediation || {}
+  const actionable = remediation?.actionable || {}
+  const patchAvailableUnpatched = remediation?.patch_available_unpatched || {}
+  const noPatchAvailable = remediation?.no_patch_available || {}
+  const score = scoreFromSecurity(data?.security)
   const evidence = data?.evidence || {}
   const assetRows = data?.security?.assets || []
   const cloudProvider = data?.cloud?.provider || 'local'
+  const serviceCommit = data?.service?.git_commit ? String(data.service.git_commit) : 'unknown'
+  const generatedAt = data?.generated_at ? new Date(data.generated_at).toLocaleString() : '-'
 
   const assetColumns = [
     {
@@ -144,6 +152,10 @@ function Attestation() {
         Live operational narrative across the application, container supply chain, host runtime, and cloud context.
       </Typography>
 
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+        Last generated: {generatedAt}
+      </Typography>
+
       {loading && <LinearProgress sx={{ mb: 2 }} />}
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -151,18 +163,24 @@ function Attestation() {
         </Alert>
       )}
 
+      <Typography variant="h6" sx={{ mb: 1.5 }}>
+        Executive Summary
+      </Typography>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, md: 3 }}>
           <Card>
             <CardContent>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                 <SecurityIcon color="primary" />
-                <Typography variant="subtitle2">Security Score</Typography>
+                <Typography variant="subtitle2">Actionable Findings Score</Typography>
               </Stack>
               <Stack direction="row" spacing={1} alignItems="center">
                 <CircularProgress variant="determinate" value={score} />
                 <Typography variant="h5">{score}</Typography>
               </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Based on currently present findings: {actionable?.critical || 0} critical, {actionable?.high || 0} high.
+              </Typography>
             </CardContent>
           </Card>
         </Grid>
@@ -187,11 +205,20 @@ function Attestation() {
             <CardContent>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                 <Inventory2Icon color="info" />
-                <Typography variant="subtitle2">Assets Tracked</Typography>
+                <Typography variant="subtitle2">Immediate Upgrade Path</Typography>
               </Stack>
-              <Typography variant="h5">{assetRows.length}</Typography>
+              <Typography variant="h5">{patchAvailableUnpatched?.total || 0}</Typography>
               <Typography variant="body2" color="text.secondary">
-                backend, caddy, postgres evidence correlated
+                patch available and not patched
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                High {patchAvailableUnpatched?.high || 0} / Critical {patchAvailableUnpatched?.critical || 0}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Awaiting upstream patch: {noPatchAvailable?.total || 0}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                High {noPatchAvailable?.high || 0} / Critical {noPatchAvailable?.critical || 0}
               </Typography>
             </CardContent>
           </Card>
@@ -213,45 +240,69 @@ function Attestation() {
         </Grid>
       </Grid>
 
+      <Typography variant="h6" sx={{ mb: 1.5 }}>
+        Remediation Focus
+      </Typography>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Card>
+            <CardContent>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                <SecurityIcon color="warning" />
+                <Typography variant="subtitle2">Actionable Findings</Typography>
+              </Stack>
+              <Typography variant="h5">{actionable?.total || 0}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                findings currently present in the running assets
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                High {actionable?.high || 0} / Critical {actionable?.critical || 0}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Card>
+            <CardContent>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                <BuildCircleIcon color="info" />
+                <Typography variant="subtitle2">Awaiting Upstream Patch</Typography>
+              </Stack>
+              <Typography variant="h5">{noPatchAvailable?.total || 0}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                findings without a currently published fix version
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                High {noPatchAvailable?.high || 0} / Critical {noPatchAvailable?.critical || 0}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Card>
+            <CardContent>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                <FactCheckIcon color="success" />
+                <Typography variant="subtitle2">Historical Totals</Typography>
+              </Stack>
+              <Typography variant="h5">{totals?.vulnerabilities || 0}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                total findings across scanned assets
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Already fixed status: {totals?.remediated || 0}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      <Typography variant="h6" sx={{ mb: 1.5 }}>
+        Infrastructure Context
+      </Typography>
       <Grid container spacing={2}>
-        <Grid size={{ xs: 12, lg: 8 }}>
-          <Paper sx={{ p: 2, height: '100%' }}>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-              <Inventory2Icon color="primary" />
-              <Typography variant="h6">Asset Inventory</Typography>
-            </Stack>
-            <DataGrid
-              autoHeight
-              rows={assetRows}
-              columns={assetColumns}
-              disableRowSelectionOnClick
-              hideFooter={assetRows.length <= 5}
-              pageSizeOptions={[5, 10]}
-              initialState={{
-                pagination: { paginationModel: { pageSize: 5, page: 0 } },
-              }}
-              sx={{ border: 0 }}
-            />
-          </Paper>
-        </Grid>
-
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <Paper sx={{ p: 2, height: '100%' }}>
-            <Typography variant="h6" sx={{ mb: 1 }}>Narrative Signals</Typography>
-            <Stack spacing={1.2}>
-              {(data?.insights || []).map((insight) => (
-                <Alert
-                  key={insight}
-                  severity={insight.toLowerCase().includes('critical') ? 'warning' : 'info'}
-                  variant="outlined"
-                >
-                  {insight}
-                </Alert>
-              ))}
-            </Stack>
-          </Paper>
-        </Grid>
-
         <Grid size={{ xs: 12, md: 6, lg: 3 }}>
           <Paper sx={{ p: 2, height: '100%' }}>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
@@ -261,7 +312,7 @@ function Attestation() {
             <Stack spacing={1}>
               <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Service</Typography><Chip label={data?.service?.name || '-'} size="small" /></Stack>
               <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Version</Typography><Chip label={data?.service?.version || '-'} size="small" /></Stack>
-              <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Commit</Typography><Chip label={data?.service?.git_commit || 'unknown'} size="small" /></Stack>
+              <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Commit</Typography><Chip label={serviceCommit} size="small" /></Stack>
               <Stack direction="row" justifyContent="space-between"><Typography variant="body2">FastAPI</Typography><Chip label={data?.service?.fastapi_version || '-'} size="small" /></Stack>
               <Stack direction="row" justifyContent="space-between"><Typography variant="body2">SQLAlchemy</Typography><Chip label={data?.service?.sqlalchemy_version || '-'} size="small" /></Stack>
             </Stack>
@@ -320,15 +371,79 @@ function Attestation() {
           <Paper sx={{ p: 2, height: '100%' }}>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
               <CloudQueueIcon color="primary" />
-              <Typography variant="h6">Cloud and Controls</Typography>
+              <Typography variant="h6">Cloud Identity</Typography>
             </Stack>
             <Stack spacing={1}>
               <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Provider</Typography><Chip label={cloudProvider} size="small" /></Stack>
               <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Region</Typography><Chip label={data?.cloud?.region || '-'} size="small" /></Stack>
+              <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Availability Zone</Typography><Chip label={data?.cloud?.availability_zone || '-'} size="small" /></Stack>
               <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Instance</Typography><Chip label={data?.cloud?.instance_type || '-'} size="small" /></Stack>
+              <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Instance ID</Typography><Chip label={data?.cloud?.instance_id || '-'} size="small" /></Stack>
+              <Stack direction="row" justifyContent="space-between"><Typography variant="body2">AMI</Typography><Chip label={data?.cloud?.ami_id || '-'} size="small" /></Stack>
+              <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Account</Typography><Chip label={data?.cloud?.account_id || '-'} size="small" /></Stack>
+            </Stack>
+          </Paper>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 6, lg: 3 }}>
+          <Paper sx={{ p: 2, height: '100%' }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+              <SecurityIcon color="primary" />
+              <Typography variant="h6">Metadata Controls</Typography>
+            </Stack>
+            <Stack spacing={1}>
+              <Stack direction="row" justifyContent="space-between"><Typography variant="body2">IMDS Reachable</Typography><Chip label={data?.cloud?.metadata_reachable ? 'yes' : 'no'} color={data?.cloud?.metadata_reachable ? 'success' : 'default'} size="small" /></Stack>
+              <Stack direction="row" justifyContent="space-between"><Typography variant="body2">IMDSv2 Required</Typography><Chip label={data?.cloud?.imdsv2_required ? 'yes' : 'no/unknown'} color={data?.cloud?.imdsv2_required ? 'success' : 'warning'} size="small" /></Stack>
+              <Stack direction="row" justifyContent="space-between"><Typography variant="body2">IAM Role</Typography><Chip label={data?.cloud?.iam_role_attached ? (data?.cloud?.iam_role_name || 'attached') : 'not attached'} color={data?.cloud?.iam_role_attached ? 'success' : 'warning'} size="small" /></Stack>
+              <Stack direction="row" justifyContent="space-between"><Typography variant="body2">VPC</Typography><Chip label={data?.cloud?.vpc_id || '-'} size="small" /></Stack>
+              <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Subnet</Typography><Chip label={data?.cloud?.subnet_id || '-'} size="small" /></Stack>
               <Divider />
               <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Token Grants</Typography><Chip label={data?.auth?.token_grants_configured ? 'enabled' : 'disabled'} color={data?.auth?.token_grants_configured ? 'success' : 'default'} size="small" /></Stack>
               <Stack direction="row" justifyContent="space-between"><Typography variant="body2">Legacy Token</Typography><Chip label={data?.auth?.legacy_token_enabled ? 'enabled' : 'disabled'} color={data?.auth?.legacy_token_enabled ? 'warning' : 'default'} size="small" /></Stack>
+            </Stack>
+          </Paper>
+        </Grid>
+
+        <Grid size={{ xs: 12 }}>
+          <Typography variant="h6" sx={{ mb: 1.5, mt: 1 }}>
+            Evidence and Signals
+          </Typography>
+        </Grid>
+
+        <Grid size={{ xs: 12, lg: 8 }}>
+          <Paper sx={{ p: 2, height: '100%' }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+              <Inventory2Icon color="primary" />
+              <Typography variant="h6">Asset Inventory</Typography>
+            </Stack>
+            <DataGrid
+              autoHeight
+              rows={assetRows}
+              columns={assetColumns}
+              disableRowSelectionOnClick
+              hideFooter={assetRows.length <= 5}
+              pageSizeOptions={[5, 10]}
+              initialState={{
+                pagination: { paginationModel: { pageSize: 5, page: 0 } },
+              }}
+              sx={{ border: 0 }}
+            />
+          </Paper>
+        </Grid>
+
+        <Grid size={{ xs: 12, lg: 4 }}>
+          <Paper sx={{ p: 2, height: '100%' }}>
+            <Typography variant="h6" sx={{ mb: 1 }}>Narrative Signals</Typography>
+            <Stack spacing={1.2}>
+              {(data?.insights || []).map((insight) => (
+                <Alert
+                  key={insight}
+                  severity={insight.toLowerCase().includes('critical') ? 'warning' : 'info'}
+                  variant="outlined"
+                >
+                  {insight}
+                </Alert>
+              ))}
             </Stack>
           </Paper>
         </Grid>

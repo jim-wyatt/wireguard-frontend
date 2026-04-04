@@ -5,7 +5,11 @@ services:
     build:
       context: ./backend
       dockerfile: Containerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
     environment:
+      GIT_COMMIT: ${GIT_COMMIT:-unknown}
+      APP_VERSION: ${APP_VERSION:-1.0.0}
       DATABASE_URL: ${DATABASE_URL}
       WG_INTERFACE: ${WG_INTERFACE}
       WG_SERVER_IP: ${WG_SERVER_IP}
@@ -18,6 +22,7 @@ services:
       API_SECRET_KEY: ${API_SECRET_KEY}
       API_AUTH_TOKEN: ${API_AUTH_TOKEN}
       WG_CONNECTED_TIMEOUT_SECONDS: ${WG_CONNECTED_TIMEOUT_SECONDS:-120}
+      METRICS_ENDPOINT_URL: ${METRICS_ENDPOINT_URL:-http://127.0.0.1:2019/metrics}
       APP_LOG_PATH: /var/log/wg/backend.log
       SYSTEM_LOG_PATH: /host/var/log/dpkg.log
       CORS_ORIGINS: '["https://${DOMAIN}"]'

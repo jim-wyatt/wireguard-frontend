@@ -22,7 +22,7 @@ def test_create_client_requires_authentication(unauthenticated_client):
     assert response.json()["detail"] == "Authentication required"
 
 
-def test_management_reads_require_authentication(unauthenticated_client, db_session):
+def test_management_reads_are_public_with_redaction(unauthenticated_client, db_session):
     db_client = Client(
         email="reader@example.com",
         name="Reader",
@@ -37,10 +37,16 @@ def test_management_reads_require_authentication(unauthenticated_client, db_sess
     db_session.refresh(db_client)
 
     list_response = unauthenticated_client.get("/api/clients")
-    assert list_response.status_code == 401
+    assert list_response.status_code == 200
+    body = list_response.json()
+    assert body
+    assert body[0]["email"] != "reader@example.com"
+    assert "*" in body[0]["email"]
+    assert body[0]["ip_address"] != "10.0.0.20"
 
     detail_response = unauthenticated_client.get(f"/api/clients/{db_client.id}")
-    assert detail_response.status_code == 401
+    assert detail_response.status_code == 200
+    assert detail_response.json()["email"] != "reader@example.com"
 
 
 def test_dashboard_reads_are_public(unauthenticated_client, monkeypatch):
@@ -50,7 +56,7 @@ def test_dashboard_reads_are_public(unauthenticated_client, monkeypatch):
     assert stats.status_code == 200
 
     connected = unauthenticated_client.get("/api/clients/connected")
-    assert connected.status_code == 401
+    assert connected.status_code == 200
 
 
 def test_create_client_and_reject_duplicate_email(client, monkeypatch):

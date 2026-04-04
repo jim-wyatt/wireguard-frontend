@@ -57,6 +57,26 @@ echo "======================================="
 echo "Production Deployment"
 echo "======================================="
 
+if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    export GIT_COMMIT="$(git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
+    SHORT_COMMIT="$(git rev-parse --short=7 HEAD 2>/dev/null || echo unknown)"
+    MINOR_REV="$(git rev-list --count HEAD 2>/dev/null || echo 0)"
+else
+    export GIT_COMMIT="unknown"
+    SHORT_COMMIT="unknown"
+    MINOR_REV="0"
+fi
+
+APP_VERSION_MAJOR="${APP_VERSION_MAJOR:-1}"
+export APP_VERSION="${APP_VERSION_MAJOR}.${MINOR_REV}+${SHORT_COMMIT}"
+
+echo "Using app version: $APP_VERSION"
+echo "Using commit: $GIT_COMMIT"
+
+if [ "${COMPOSE_CMD[0]}" = "sudo" ]; then
+    COMPOSE_CMD=("sudo" "GIT_COMMIT=$GIT_COMMIT" "APP_VERSION=$APP_VERSION" "${COMPOSE_CMD[@]:1}")
+fi
+
 # Check if .env exists
 if [ ! -f .env ]; then
     echo "ERROR: .env file not found!"

@@ -9,6 +9,7 @@ from app.core.logging_config import configure_logging
 from app.api import clients
 from app.api import logs
 from app.api import attestation
+from app.api import metrics
 from app.db.database import engine, Base, SessionLocal
 from app.services.client_sync import sync_clients_with_wireguard
 
@@ -39,7 +40,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="WireGuard Management API",
         description="API for managing WireGuard VPN clients",
-        version="1.0.0",
+        version=settings.APP_VERSION,
         lifespan=lifespan,
         docs_url="/docs" if settings.ENABLE_API_DOCS else None,
         openapi_url="/openapi.json" if settings.ENABLE_API_DOCS else None,
@@ -58,12 +59,13 @@ def create_app() -> FastAPI:
     app.include_router(clients.router, prefix="/api", tags=["clients"])
     app.include_router(logs.router, prefix="/api", tags=["logs"])
     app.include_router(attestation.router, prefix="/api", tags=["attestation"])
+    app.include_router(metrics.router, prefix="/api", tags=["metrics"])
 
     @app.get("/")
     async def root():
         return {
             "message": "WireGuard Management API",
-            "version": "1.0.0",
+            "version": settings.APP_VERSION,
             "docs": "/docs"
         }
 

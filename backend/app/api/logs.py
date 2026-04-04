@@ -8,7 +8,6 @@ from typing import AsyncIterator
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
-from app.core.auth import require_writer_role
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -93,7 +92,6 @@ async def stream_logs(
     source: LogSource = Query(default=LogSource.CADDY),
     tail: int = Query(default=100, ge=0, le=2000),
     follow: bool = Query(default=True),
-    _: None = Depends(require_writer_role),
 ):
     """Stream log lines from supported sources as plain-text chunks."""
     log_path, source_label = _path_for_source(source)
@@ -111,7 +109,6 @@ async def stream_caddy_access_log(
     request: Request,
     tail: int = Query(default=100, ge=0, le=2000),
     follow: bool = Query(default=True),
-    _: None = Depends(require_writer_role),
 ):
     """Backward-compatible caddy access log stream endpoint."""
     return await _stream_log_file(

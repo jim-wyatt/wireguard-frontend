@@ -23,8 +23,10 @@ import DashboardIcon from '@mui/icons-material/Dashboard'
 import PeopleIcon from '@mui/icons-material/People'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import PolicyIcon from '@mui/icons-material/Policy'
+import QueryStatsIcon from '@mui/icons-material/QueryStats'
 import VpnKeyIcon from '@mui/icons-material/VpnKey'
 import LogoutIcon from '@mui/icons-material/Logout'
+import LoginIcon from '@mui/icons-material/Login'
 import DarkModeIcon from '@mui/icons-material/DarkMode'
 import LightModeIcon from '@mui/icons-material/LightMode'
 import ViewSidebarIcon from '@mui/icons-material/ViewSidebar'
@@ -38,7 +40,7 @@ function Layout() {
   const [menuAnchor, setMenuAnchor] = useState(null)
   const navigate = useNavigate()
   const location = useLocation()
-  const { logout } = useAuth()
+  const { isAuthenticated, logout } = useAuth()
   const {
     matrixMode,
     sidebarVisible,
@@ -64,11 +66,17 @@ function Layout() {
     navigate('/')
   }
 
+  const handleLogin = () => {
+    handleMenuClose()
+    navigate('/login')
+  }
+
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
     { text: 'Clients', icon: <PeopleIcon />, path: '/clients' },
     { text: 'Logs', icon: <ReceiptLongIcon />, path: '/logs' },
     { text: 'Attestation', icon: <PolicyIcon />, path: '/attestation' },
+    { text: 'Metrics', icon: <QueryStatsIcon />, path: '/metrics' },
   ]
 
   const drawer = (
@@ -144,10 +152,17 @@ function Layout() {
             open={Boolean(menuAnchor)}
             onClose={handleMenuClose}
           >
-            <MenuItem onClick={handleLogout}>
-              <LogoutIcon sx={{ mr: 1 }} />
-              Logout
-            </MenuItem>
+            {isAuthenticated ? (
+              <MenuItem onClick={handleLogout}>
+                <LogoutIcon sx={{ mr: 1 }} />
+                Logout
+              </MenuItem>
+            ) : (
+              <MenuItem onClick={handleLogin}>
+                <LoginIcon sx={{ mr: 1 }} />
+                Login
+              </MenuItem>
+            )}
           </Menu>
         </Toolbar>
       </AppBar>

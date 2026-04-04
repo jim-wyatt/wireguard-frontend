@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timezone, timedelta
@@ -6,7 +6,7 @@ import logging
 
 from app.db.database import get_db
 from app.db.models import Client
-from app.core.auth import require_writer_role
+from app.core.auth import Role, optional_api_auth, require_writer_role
 from app.core.config import settings
 from app.core.rate_limit import per_ip_limit
 from app.schemas.client import (
@@ -25,6 +25,76 @@ logger = logging.getLogger(__name__)
 
 writer_rate_limit = per_ip_limit(settings.WRITER_RATE_LIMIT_PER_MINUTE)
 dashboard_rate_limit = per_ip_limit(settings.DASHBOARD_RATE_LIMIT_PER_MINUTE)
+
+
+def _fuzzy_text(value: str | None) -> str | None:
+    if not value:
+        return value
+    value = str(value)
+    if len(value) <= 2:
+        return "*" * len(value)
+    return f"{value[0]}{'*' * max(2, len(value) - 2)}{value[-1]}"
+
+
+def _fuzzy_email(value: str | None) -> str | None:
+    if not value:
+        return value
+    local, _, domain = value.partition("@")
+    if not domain:
+        return _fuzzy_text(value)
+    masked_local = _fuzzy_text(local) or "*"
+    domain_head, dot, tld = domain.partition(".")
+    masked_domain = f"{_fuzzy_text(domain_head) or '*'}{dot}{tld}" if dot else _fuzzy_text(domain)
+    return f"{masked_local}@{masked_domain}"
+
+
+def _fuzzy_ip(value: str | None) -> str | None:
+    if not value:
+        return value
+    parts = value.split(".")
+    if len(parts) == 4:
+        return f"{parts[0]}.{parts[1]}.x.x"
+    return "x.x.x.x"
+
+
+def _fuzzy_key(value: str | None) -> str | None:
+    if not value:
+        return value
+    value = str(value)
+    if len(value) <= 8:
+        return "*" * len(value)
+    return f"{value[:4]}...{value[-4:]}"
+
+
+def _is_authenticated(request: Request | None) -> bool:
+    role = getattr(getattr(request, "state", object()), "auth_role", None)
+    return role in {Role.PUBLIC.value, Role.WRITER.value}
+
+
+def _public_client_view(client: Client) -> ClientResponse:
+    return ClientResponse(
+        id=client.id,
+        email=_fuzzy_email(client.email) or "hidden@example.com",
+        name=_fuzzy_text(client.name) if client.name else None,
+        ip_address=_fuzzy_ip(client.ip_address) or "x.x.x.x",
+        public_key=_fuzzy_key(client.public_key) or "****",
+        is_active=client.is_active,
+        created_at=client.created_at,
+        last_handshake=client.last_handshake,
+        config_downloaded=client.config_downloaded,
+    )
+
+
+def _public_connected_view(client: Client, peer_info: dict) -> ClientConnected:
+    return ClientConnected(
+        id=client.id,
+        email=_fuzzy_email(client.email) or "hidden@example.com",
+        name=_fuzzy_text(client.name) if client.name else None,
+        ip_address=_fuzzy_ip(client.ip_address) or "x.x.x.x",
+        last_handshake=peer_info["last_handshake"],
+        transfer_rx=peer_info["transfer_rx"],
+        transfer_tx=peer_info["transfer_tx"],
+    )
 
 @router.post("/clients", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
 async def create_client(
@@ -105,13 +175,14 @@ async def create_client(
 
 @router.get("/clients", response_model=List[ClientResponse])
 async def list_clients(
+    request: Request,
     response: Response,
     skip: int = 0,
     limit: int = 100,
     active_only: bool = False,
     db: Session = Depends(get_db),
-    _: None = Depends(require_writer_role),
-    __: None = Depends(writer_rate_limit),
+    _: None = Depends(optional_api_auth),
+    __: None = Depends(dashboard_rate_limit),
 ):
     """List all clients"""
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -125,6 +196,10 @@ async def list_clients(
         query = query.filter(Client.is_active == True)
     
     clients = query.offset(skip).limit(limit).all()
+
+    if not _is_authenticated(request):
+        return [_public_client_view(client) for client in clients]
+
     return clients
 
 @router.get("/clients/stats", response_model=ClientStats)
@@ -164,9 +239,10 @@ async def get_stats(
 
 @router.get("/clients/connected", response_model=List[ClientConnected])
 async def get_connected_clients(
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
-    __: None = Depends(require_writer_role),
+    __: None = Depends(optional_api_auth),
     _: None = Depends(dashboard_rate_limit),
 ):
     """Get list of currently connected clients"""
@@ -198,17 +274,20 @@ async def get_connected_clients(
             db_updated = True
 
         if live_handshake and live_handshake > timeout_threshold:
-            connected_clients.append(
-                ClientConnected(
-                    id=client.id,
-                    email=client.email,
-                    name=client.name,
-                    ip_address=client.ip_address,
-                    last_handshake=live_handshake,
-                    transfer_rx=peer_info["transfer_rx"],
-                    transfer_tx=peer_info["transfer_tx"]
+            if _is_authenticated(request):
+                connected_clients.append(
+                    ClientConnected(
+                        id=client.id,
+                        email=client.email,
+                        name=client.name,
+                        ip_address=client.ip_address,
+                        last_handshake=live_handshake,
+                        transfer_rx=peer_info["transfer_rx"],
+                        transfer_tx=peer_info["transfer_tx"]
+                    )
                 )
-            )
+            else:
+                connected_clients.append(_public_connected_view(client, peer_info))
 
     if db_updated:
         db.commit()
@@ -217,10 +296,11 @@ async def get_connected_clients(
 
 @router.get("/clients/{client_id}", response_model=ClientResponse)
 async def get_client(
+    request: Request,
     client_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(require_writer_role),
-    __: None = Depends(writer_rate_limit),
+    _: None = Depends(optional_api_auth),
+    __: None = Depends(dashboard_rate_limit),
 ):
     """Get client details"""
     client = db.query(Client).filter(Client.id == client_id).first()
@@ -229,6 +309,8 @@ async def get_client(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Client not found"
         )
+    if not _is_authenticated(request):
+        return _public_client_view(client)
     return client
 
 @router.get("/clients/{client_id}/config", response_model=ClientConfig)
