@@ -1,6 +1,6 @@
 # Production Caddyfile with HTTPS
 {
-    admin 127.0.0.1:2019
+    admin off
     servers {
         protocols h1 h2
     }

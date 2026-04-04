@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timezone, timedelta
@@ -104,6 +104,7 @@ async def create_client(
 
 @router.get("/clients", response_model=List[ClientResponse])
 async def list_clients(
+    response: Response,
     skip: int = 0,
     limit: int = 100,
     active_only: bool = False,
@@ -112,6 +113,9 @@ async def list_clients(
     __: None = Depends(writer_rate_limit),
 ):
     """List all clients"""
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+
     query = db.query(Client)
     
     if active_only:
@@ -122,10 +126,14 @@ async def list_clients(
 
 @router.get("/clients/stats", response_model=ClientStats)
 async def get_stats(
+    response: Response,
     db: Session = Depends(get_db),
     _: None = Depends(dashboard_rate_limit),
 ):
     """Get client statistics"""
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+
     total_clients = db.query(Client).count()
     active_clients = db.query(Client).filter(Client.is_active == True).count()
     
@@ -150,10 +158,15 @@ async def get_stats(
 
 @router.get("/clients/connected", response_model=List[ClientConnected])
 async def get_connected_clients(
+    response: Response,
     db: Session = Depends(get_db),
+    __: None = Depends(require_writer_role),
     _: None = Depends(dashboard_rate_limit),
 ):
     """Get list of currently connected clients"""
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+
     # Get connected peers from WireGuard
     connected_peers = wireguard_service.get_connected_peers()
     

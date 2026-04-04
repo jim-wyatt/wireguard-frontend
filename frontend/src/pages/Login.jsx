@@ -33,8 +33,8 @@ function Login() {
         return
       }
 
-      // Try a simple API call to validate the token
-      const response = await fetch('/api/clients/stats', {
+      // Validate token against a protected endpoint
+      const response = await fetch('/api/clients?limit=1', {
         headers: {
           'Authorization': `Bearer ${token.trim()}`
         }
@@ -43,6 +43,8 @@ function Login() {
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
           setError('Invalid API token')
+        } else if (response.status === 429) {
+          setError('Too many failed login attempts. Please wait a few minutes and try again.')
         } else {
           setError(`API Error: ${response.statusText}`)
         }
@@ -52,7 +54,7 @@ function Login() {
 
       // Token is valid, save it and navigate
       login(token.trim())
-      navigate('/')
+      navigate('/dashboard')
     } catch (err) {
       setError(`Connection error: ${err.message}`)
       setLoading(false)

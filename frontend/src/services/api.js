@@ -33,10 +33,22 @@ export const clientsApi = {
   getClients: () => api.get('/clients'),
   
   // Get client stats
-  getStats: () => api.get('/clients/stats'),
+  getStats: () => api.get('/clients/stats', {
+    params: { _ts: Date.now() },
+    headers: {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+  }),
   
   // Get connected clients
-  getConnectedClients: () => api.get('/clients/connected'),
+  getConnectedClients: () => api.get('/clients/connected', {
+    params: { _ts: Date.now() },
+    headers: {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+  }),
   
   // Get single client
   getClient: (id) => api.get(`/clients/${id}`),

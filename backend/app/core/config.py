@@ -27,8 +27,10 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
     WRITER_RATE_LIMIT_PER_MINUTE: int = 60
     DASHBOARD_RATE_LIMIT_PER_MINUTE: int = 120
+    AUTH_FAIL_RATE_LIMIT_PER_MINUTE: int = 12
+    AUTH_FAIL_BLOCK_SECONDS: int = 300
     ENABLE_API_DOCS: bool = False
-    WG_CONNECTED_TIMEOUT_SECONDS: int = 180  # Consider peer connected if handshake within 3 min
+    WG_CONNECTED_TIMEOUT_SECONDS: int = 25  # Consider peer connected if handshake within keepalive window
 
     def cors_origins_list(self) -> List[str]:
         raw = (self.CORS_ORIGINS or "").strip()
@@ -47,8 +49,11 @@ class Settings(BaseSettings):
         auth_token = (self.API_AUTH_TOKEN or "").strip()
         api_secret = (self.API_SECRET_KEY or "").strip()
 
-        if not auth_token and (not api_secret or api_secret == DEFAULT_INSECURE_SECRET):
-            raise ValueError("Set API_AUTH_TOKEN or a non-default API_SECRET_KEY before startup")
+        if not auth_token:
+            raise ValueError("Set API_AUTH_TOKEN before startup")
+
+        if not api_secret or api_secret == DEFAULT_INSECURE_SECRET:
+            raise ValueError("Set a non-default API_SECRET_KEY before startup")
 
         origins = self.cors_origins_list()
         if "*" in origins:

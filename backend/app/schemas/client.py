@@ -3,13 +3,13 @@ from datetime import datetime
 from typing import Optional
 
 class ClientBase(BaseModel):
-    email: EmailStr
     name: Optional[str] = Field(default=None, max_length=128)
 
 class ClientCreate(ClientBase):
-    pass
+    email: EmailStr
 
 class ClientResponse(ClientBase):
+    email: str
     id: int
     ip_address: str
     public_key: str

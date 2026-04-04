@@ -7,6 +7,7 @@ import { useAuth } from './context/AuthContext'
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Clients = lazy(() => import('./pages/Clients'))
 const Login = lazy(() => import('./pages/Login'))
+const PublicDashboard = lazy(() => import('./pages/PublicDashboard'))
 
 function PageLoader() {
   return (
@@ -16,21 +17,17 @@ function PageLoader() {
   )
 }
 
-function ProtectedRoute({ children }) {
-  const { isAuthenticated } = useAuth()
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
-  
-  return children
-}
-
 function App() {
   const { isAuthenticated } = useAuth()
   
   return (
     <Routes>
+      <Route path="/" element={
+        <Suspense fallback={<PageLoader />}>
+          <PublicDashboard />
+        </Suspense>
+      } />
+
       <Route path="/login" element={
         <Suspense fallback={<PageLoader />}>
           <Login />
@@ -39,7 +36,7 @@ function App() {
       
       {isAuthenticated ? (
         <Route element={<Layout />}>
-          <Route path="/" element={
+          <Route path="/dashboard" element={
             <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
               <Suspense fallback={<PageLoader />}>
                 <Dashboard />
@@ -55,8 +52,14 @@ function App() {
           } />
         </Route>
       ) : (
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="/dashboard" element={<Navigate to="/login" replace />} />
       )}
+
+      {!isAuthenticated && (
+        <Route path="/clients" element={<Navigate to="/login" replace />} />
+      )}
+
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

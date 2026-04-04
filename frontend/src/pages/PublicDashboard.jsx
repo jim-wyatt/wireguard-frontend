@@ -1,0 +1,102 @@
+import { useEffect, useState } from 'react'
+import { Link as RouterLink } from 'react-router-dom'
+import {
+  Box,
+  Grid,
+  Card,
+  CardContent,
+  Typography,
+  Container,
+  Button,
+  Paper,
+} from '@mui/material'
+import PeopleIcon from '@mui/icons-material/People'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import SignalCellularAltIcon from '@mui/icons-material/SignalCellularAlt'
+import { clientsApi } from '../services/api'
+
+function PublicDashboard() {
+  const [stats, setStats] = useState(null)
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const response = await clientsApi.getStats()
+        setStats(response.data)
+      } catch (err) {
+        console.error('Failed to load public stats:', err)
+      }
+    }
+
+    loadStats()
+    const interval = setInterval(loadStats, 3000)
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <Container maxWidth="lg" sx={{ py: 6 }}>
+      <Typography variant="h3" gutterBottom>
+        WireGuard Status
+      </Typography>
+      <Typography color="text.secondary" sx={{ mb: 4 }}>
+        Public aggregate metrics for the VPN service.
+      </Typography>
+
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} sm={4}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <PeopleIcon sx={{ fontSize: 40, mr: 2, color: 'primary.main' }} />
+                <Box>
+                  <Typography variant="h4">{stats?.total_clients || 0}</Typography>
+                  <Typography color="text.secondary">Total Clients</Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={4}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <CheckCircleIcon sx={{ fontSize: 40, mr: 2, color: 'success.main' }} />
+                <Box>
+                  <Typography variant="h4">{stats?.active_clients || 0}</Typography>
+                  <Typography color="text.secondary">Active Clients</Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} sm={4}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <SignalCellularAltIcon sx={{ fontSize: 40, mr: 2, color: 'info.main' }} />
+                <Box>
+                  <Typography variant="h4">{stats?.connected_clients || 0}</Typography>
+                  <Typography color="text.secondary">Connected Now</Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      <Paper sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+        <Box>
+          <Typography variant="h6">Administrator Access</Typography>
+          <Typography color="text.secondary">Login to manage clients and view detailed connection data.</Typography>
+        </Box>
+        <Button variant="contained" component={RouterLink} to="/login">
+          Login
+        </Button>
+      </Paper>
+    </Container>
+  )
+}
+
+export default PublicDashboard

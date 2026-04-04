@@ -48,11 +48,11 @@ function Layout() {
   const handleLogout = () => {
     handleMenuClose()
     logout()
-    navigate('/login')
+    navigate('/')
   }
 
   const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
     { text: 'Clients', icon: <PeopleIcon />, path: '/clients' },
   ]
 
