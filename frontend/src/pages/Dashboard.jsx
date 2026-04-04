@@ -26,7 +26,7 @@ function Dashboard() {
 
   useEffect(() => {
     loadData()
-    const interval = setInterval(loadData, 10000) // Refresh every 10 seconds
+    const interval = setInterval(loadData, 3000) // Refresh every 3 seconds for real-time updates
     return () => clearInterval(interval)
   }, [])
 

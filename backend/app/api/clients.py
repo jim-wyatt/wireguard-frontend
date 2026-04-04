@@ -145,6 +145,7 @@ async def get_connected_clients(
     _: None = Depends(dashboard_rate_limit),
 ):
     """Get list of currently connected clients"""
+    from datetime import datetime, timezone, timedelta
     
     # Get connected peers from WireGuard
     connected_peers = wireguard_service.get_connected_peers()
@@ -152,10 +153,14 @@ async def get_connected_clients(
     # Get clients from database
     clients = db.query(Client).filter(Client.is_active == True).all()
     
+    # Calculate connection timeout threshold
+    now = datetime.now(timezone.utc)
+    timeout_threshold = now - timedelta(seconds=settings.WG_CONNECTED_TIMEOUT_SECONDS)
+    
     connected_clients = []
     for client in clients:
         peer_info = connected_peers.get(client.public_key)
-        if peer_info and peer_info["last_handshake"]:
+        if peer_info and peer_info["last_handshake"] and peer_info["last_handshake"] > timeout_threshold:
             # Update last handshake in database
             client.last_handshake = peer_info["last_handshake"]
             db.commit()

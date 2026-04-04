@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     WRITER_RATE_LIMIT_PER_MINUTE: int = 60
     DASHBOARD_RATE_LIMIT_PER_MINUTE: int = 120
     ENABLE_API_DOCS: bool = False
+    WG_CONNECTED_TIMEOUT_SECONDS: int = 180  # Consider peer connected if handshake within 3 min
 
     def cors_origins_list(self) -> List[str]:
         raw = (self.CORS_ORIGINS or "").strip()
