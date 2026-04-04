@@ -42,9 +42,9 @@ cp .env.example .env
 nano .env
 # Set all required values
 
-# 3. Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
+# 3. Install Podman
+sudo apt update
+sudo apt install -y podman podman-compose
 
 # 4. Deploy
 make prod-up
@@ -118,9 +118,9 @@ Before going to production:
 
 ### Services won't start
 ```bash
-# Check Docker
-docker-compose ps
-docker-compose logs
+# Check Podman Compose
+podman compose ps
+podman compose logs
 
 # Check WireGuard
 sudo systemctl status wg-quick@wg0
@@ -146,7 +146,7 @@ ls -la /etc/wireguard/
 curl http://localhost:8000/health
 
 # Check network
-docker network ls
+podman network ls
 ```
 
 ## 📚 Next Steps
@@ -161,7 +161,7 @@ docker network ls
 1. **Testing**: Use SQLite for development, PostgreSQL for production
 2. **Logs**: Always check logs when troubleshooting
 3. **Backups**: Run regular backups (make backup-db, make backup-wg)
-4. **Updates**: Keep Docker images and system packages updated
+4. **Updates**: Keep Podman images and system packages updated
 5. **Security**: Never commit .env files to version control
 
 ## 🆘 Getting Help

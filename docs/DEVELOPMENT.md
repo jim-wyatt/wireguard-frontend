@@ -31,7 +31,7 @@ wireguard-frontend/
 │   │   ├── services/       # Business logic
 │   │   └── main.py         # FastAPI app
 │   ├── requirements.txt
-│   └── Dockerfile
+│   └── Containerfile
 ├── frontend/               # React frontend
 │   ├── src/
 │   │   ├── components/    # React components
@@ -41,22 +41,22 @@ wireguard-frontend/
 │   │   └── main.jsx
 │   ├── package.json
 │   ├── vite.config.js
-│   └── Dockerfile
+│   └── Containerfile
 ├── caddy/                 # Caddy configuration
 │   ├── Caddyfile
 │   └── Caddyfile.prod
 ├── scripts/               # Utility scripts
 ├── docs/                  # Documentation
-├── docker-compose.yml
+├── compose.yml
 └── README.md
 ```
 
 ## Running Development Server
 
-### Option 1: Docker Compose (Recommended)
+### Option 1: Podman Compose (Recommended)
 
 ```bash
-docker-compose up
+podman compose -f compose.yml up
 ```
 
 Services will be available at:
@@ -89,7 +89,7 @@ No setup required. Database file is created automatically.
 
 1. Start PostgreSQL:
 ```bash
-docker run -d \
+podman run -d \
   -e POSTGRES_USER=wireguard \
   -e POSTGRES_PASSWORD=password \
   -e POSTGRES_DB=wireguard \
@@ -278,7 +278,7 @@ Backend needs elevated privileges to manage WireGuard. Run with:
 sudo -E env PATH=$PATH uvicorn app.main:app --reload
 ```
 
-Or use Docker with proper capabilities.
+Or use Podman with proper capabilities.
 
 ### Port already in use
 

@@ -47,7 +47,7 @@ npm run build
 cd ..
 
 echo "Building and starting services..."
-docker-compose -f docker-compose.prod.yml up -d --build
+podman compose -f compose.prod.yml up -d --build
 
 echo ""
 echo "======================================="
@@ -60,7 +60,7 @@ echo "  - API: https://$DOMAIN/api"
 echo "  - Metrics: http://$DOMAIN:2019/metrics"
 echo ""
 echo "To view logs:"
-echo "  docker-compose -f docker-compose.prod.yml logs -f"
+echo "  podman compose -f compose.prod.yml logs -f"
 echo ""
 echo "To check WireGuard status:"
 echo "  sudo wg show"

@@ -12,12 +12,12 @@
 {$DOMAIN:localhost} {
     # API reverse proxy
     handle /api/* {
-        reverse_proxy backend:8000
+        reverse_proxy host.containers.internal:8000
     }
 
     # Frontend
     handle {
-        reverse_proxy frontend:5173
+        reverse_proxy frontend:80
     }
 
     # Enable gzip compression
@@ -28,8 +28,10 @@
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Content-Type-Options "nosniff"
         X-Frame-Options "SAMEORIGIN"
-        X-XSS-Protection "1; mode=block"
+        Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+        Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
         Referrer-Policy "strict-origin-when-cross-origin"
+        X-Permitted-Cross-Domain-Policies "none"
     }
 
     # Logging

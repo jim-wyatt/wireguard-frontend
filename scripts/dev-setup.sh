@@ -14,14 +14,17 @@ echo "======================================="
 if [ ! -f .env ]; then
     echo "Creating .env file from example..."
     cp .env.example .env
-    echo "Please edit .env file with your configuration"
-    echo "Especially set these values:"
-    echo "  - WG_SERVER_PUBLIC_KEY"
-    echo "  - WG_SERVER_PRIVATE_KEY"
-    echo "  - WG_SERVER_ENDPOINT"
-    echo "  - API_SECRET_KEY (generate with: openssl rand -hex 32)"
-    read -p "Press enter when ready to continue..."
 fi
+
+echo "Generating backend API secrets..."
+chmod +x "$SCRIPT_DIR/generate-secrets.sh"
+"$SCRIPT_DIR/generate-secrets.sh"
+
+echo "Please verify these .env values before starting:"
+echo "  - WG_SERVER_PUBLIC_KEY"
+echo "  - WG_SERVER_PRIVATE_KEY"
+echo "  - WG_SERVER_ENDPOINT"
+read -p "Press enter when ready to continue..."
 
 # Setup backend
 echo ""
@@ -63,6 +66,6 @@ echo "2. Frontend (in another terminal):"
 echo "   cd frontend"
 echo "   npm run dev"
 echo ""
-echo "Or use Docker Compose:"
-echo "   docker-compose up"
+echo "Or use Podman Compose:"
+echo "   podman compose up"
 echo ""

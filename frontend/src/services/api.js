@@ -17,6 +17,17 @@ const api = axios.create({
   },
 });
 
+api.interceptors.request.use((config) => {
+  const token = (window.localStorage.getItem('apiToken') || '').trim();
+  if (token) {
+    config.headers = {
+      ...config.headers,
+      Authorization: `Bearer ${token}`,
+    };
+  }
+  return config;
+});
+
 export const clientsApi = {
   // Get all clients
   getClients: () => api.get('/clients'),

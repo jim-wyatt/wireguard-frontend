@@ -26,7 +26,7 @@ A modern web application for managing WireGuard VPN clients with an intuitive in
 
 ### Infrastructure
 - Caddy (Reverse proxy & HTTPS)
-- Docker & Docker Compose
+- Podman & Podman Compose
 - WireGuard (Port 443/UDP)
 
 ## Project Structure
@@ -36,13 +36,19 @@ wireguard-frontend/
 ├── frontend/          # React + Vite application
 ├── backend/           # FastAPI application
 ├── caddy/             # Caddy configuration
-├── docker-compose.yml # Docker services
+├── compose.yml        # Compose services
 └── README.md
 ```
 
 ## Quick Start
 
 ### Development
+
+Use the setup script to install dependencies and generate random API secrets/tokens:
+
+```bash
+./scripts/dev-setup.sh
+```
 
 1. **Backend**
 ```bash
@@ -60,10 +66,10 @@ npm install
 npm run dev
 ```
 
-### Production with Docker
+### Production with Podman
 
 ```bash
-docker-compose up -d
+podman compose -f compose.yml up -d
 ```
 
 ## Configuration
@@ -86,7 +92,16 @@ WG_SERVER_PUBLIC_KEY=<your-public-key>
 
 # API
 API_SECRET_KEY=<generate-a-secure-key>
+API_AUTH_TOKEN=<shared-token-for-protected-api-routes>
 ```
+
+Do not expose `API_AUTH_TOKEN` to browser build variables. For admin actions from the UI, set a temporary session token in browser local storage:
+
+```js
+localStorage.setItem('apiToken', '<API_AUTH_TOKEN>')
+```
+
+Public dashboard endpoints remain readable without authentication.
 
 ## WireGuard Setup
 
@@ -105,12 +120,16 @@ sudo nano /etc/wireguard/wg0.conf
 
 ## API Endpoints
 
-- `POST /api/clients` - Create new client
-- `GET /api/clients` - List all clients
-- `GET /api/clients/{id}` - Get client details
-- `GET /api/clients/{id}/config` - Download client config
-- `GET /api/clients/connected` - List connected clients
-- `DELETE /api/clients/{id}` - Remove client
+- Public dashboard reads:
+	- `GET /api/clients/stats`
+	- `GET /api/clients/connected`
+- Writer-auth protected routes:
+	- `POST /api/clients`
+	- `GET /api/clients`
+	- `GET /api/clients/{id}`
+	- `GET /api/clients/{id}/config`
+	- `PATCH /api/clients/{id}/toggle`
+	- `DELETE /api/clients/{id}`
 
 ## Security Notes
 

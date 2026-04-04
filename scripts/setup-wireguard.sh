@@ -32,7 +32,7 @@ SERVER_PUBLIC_KEY=$(cat server_public.key)
 echo ""
 echo "Server keys generated!"
 echo "Public Key: $SERVER_PUBLIC_KEY"
-echo "Private Key: $SERVER_PRIVATE_KEY"
+echo "Private key written to /etc/wireguard/server_private.key"
 echo ""
 
 # Get server IP and interface
@@ -90,7 +90,7 @@ echo ""
 echo "Add these values to your .env file:"
 echo ""
 echo "WG_SERVER_PUBLIC_KEY=$SERVER_PUBLIC_KEY"
-echo "WG_SERVER_PRIVATE_KEY=$SERVER_PRIVATE_KEY"
+echo "WG_SERVER_PRIVATE_KEY=<contents of /etc/wireguard/server_private.key>"
 echo "WG_SERVER_ENDPOINT=$SERVER_ENDPOINT:443"
 echo ""
 echo "To check WireGuard status:"

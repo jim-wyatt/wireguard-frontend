@@ -1,4 +1,7 @@
-.PHONY: help dev-setup dev-up dev-down prod-build prod-up prod-down logs clean test lint format
+.PHONY: help dev-setup dev-up dev-down prod-build prod-up prod-down logs clean test lint format smoke e2e
+
+CONTAINER_ENGINE ?= podman
+COMPOSE ?= $(CONTAINER_ENGINE) compose
 
 help:
 	@echo "WireGuard Management - Available Commands"
@@ -16,6 +19,8 @@ help:
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make test         - Run tests"
+	@echo "  make smoke        - Run API smoke tests"
+	@echo "  make e2e          - Run frontend Playwright E2E tests"
 	@echo "  make lint         - Run linters"
 	@echo "  make format       - Format code"
 	@echo "  make clean        - Clean up generated files"
@@ -27,7 +32,7 @@ dev-setup:
 
 dev-up:
 	@echo "Starting development environment..."
-	docker-compose up -d
+	$(COMPOSE) up -d
 	@echo "Services started:"
 	@echo "  Frontend: http://localhost:5173"
 	@echo "  Backend: http://localhost:8000"
@@ -35,13 +40,13 @@ dev-up:
 
 dev-down:
 	@echo "Stopping development environment..."
-	docker-compose down
+	$(COMPOSE) down
 
 prod-build:
 	@echo "Building production images..."
 	chmod +x scripts/ensure-node-lts.sh
 	bash -c 'source scripts/ensure-node-lts.sh && cd frontend && npm install && npm run build'
-	docker-compose -f docker-compose.prod.yml build
+	$(COMPOSE) -f compose.prod.yml build
 
 prod-up:
 	@echo "Starting production environment..."
@@ -50,19 +55,19 @@ prod-up:
 
 prod-down:
 	@echo "Stopping production environment..."
-	docker-compose -f docker-compose.prod.yml down
+	$(COMPOSE) -f compose.prod.yml down
 
 logs:
-	docker-compose logs -f
+	$(COMPOSE) logs -f
 
 logs-backend:
-	docker-compose logs -f backend
+	$(COMPOSE) logs -f backend
 
 logs-frontend:
-	docker-compose logs -f frontend
+	$(COMPOSE) logs -f frontend
 
 logs-caddy:
-	docker-compose logs -f caddy
+	$(COMPOSE) logs -f caddy
 
 test:
 	@echo "Running backend tests..."
@@ -70,6 +75,14 @@ test:
 	@echo "Running frontend tests..."
 	chmod +x scripts/ensure-node-lts.sh
 	bash -c 'source scripts/ensure-node-lts.sh && cd frontend && npm test'
+
+smoke:
+	@echo "Running API smoke tests against deployed environment..."
+	set -a && source .env && set +a && python3 tests/smoke/api_smoke.py
+
+e2e:
+	@echo "Running Playwright end-to-end tests..."
+	set -a && source .env && set +a && cd frontend && npm run test:e2e
 
 lint:
 	@echo "Linting backend..."
@@ -101,7 +114,7 @@ setup-wireguard:
 
 backup-db:
 	@echo "Backing up database..."
-	docker-compose exec db pg_dump -U wireguard wireguard > backup-$(shell date +%Y%m%d-%H%M%S).sql
+	$(COMPOSE) exec db pg_dump -U wireguard wireguard > backup-$(shell date +%Y%m%d-%H%M%S).sql
 	@echo "Database backed up!"
 
 backup-wg:
@@ -111,7 +124,7 @@ backup-wg:
 
 status:
 	@echo "Service Status:"
-	@docker-compose ps
+	@$(COMPOSE) ps
 	@echo ""
 	@echo "WireGuard Status:"
 	@sudo wg show 2>/dev/null || echo "WireGuard not running or no permission"

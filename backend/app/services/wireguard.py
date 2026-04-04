@@ -1,8 +1,14 @@
 import subprocess
 import ipaddress
+import logging
+import re
 from typing import List, Dict, Optional
 from datetime import datetime
 from app.core.config import settings
+
+
+logger = logging.getLogger(__name__)
+WG_PUBLIC_KEY_PATTERN = re.compile(r"^[A-Za-z0-9+/]{43}=$")
 
 class WireGuardService:
     def __init__(self):
@@ -88,6 +94,16 @@ PersistentKeepalive = 25
     
     def add_peer(self, public_key: str, ip_address: str) -> bool:
         """Add peer to WireGuard interface"""
+        if not WG_PUBLIC_KEY_PATTERN.match(public_key):
+            logger.warning("Rejected invalid WireGuard public key format")
+            return False
+
+        try:
+            ipaddress.ip_address(ip_address)
+        except ValueError:
+            logger.warning("Rejected invalid client IP address: %s", ip_address)
+            return False
+
         try:
             subprocess.run(
                 [
@@ -108,11 +124,15 @@ PersistentKeepalive = 25
             
             return True
         except subprocess.CalledProcessError as e:
-            print(f"Failed to add peer: {e}")
+            logger.error("Failed to add peer", exc_info=True)
             return False
     
     def remove_peer(self, public_key: str) -> bool:
         """Remove peer from WireGuard interface"""
+        if not WG_PUBLIC_KEY_PATTERN.match(public_key):
+            logger.warning("Rejected invalid WireGuard public key format on remove")
+            return False
+
         try:
             subprocess.run(
                 ["wg", "set", self.interface, "peer", public_key, "remove"],
@@ -129,8 +149,40 @@ PersistentKeepalive = 25
             
             return True
         except subprocess.CalledProcessError as e:
-            print(f"Failed to remove peer: {e}")
+            logger.error("Failed to remove peer", exc_info=True)
             return False
+
+    def get_configured_peers(self) -> List[Dict[str, Optional[str]]]:
+        """Read peers configured on the WireGuard interface from `wg show ... dump`."""
+        try:
+            result = subprocess.run(
+                ["wg", "show", self.interface, "dump"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+            peers: List[Dict[str, Optional[str]]] = []
+            lines = result.stdout.strip().split("\n")
+
+            # Skip first line (interface metadata)
+            for line in lines[1:]:
+                parts = line.split("\t")
+                if len(parts) < 4:
+                    continue
+
+                peers.append(
+                    {
+                        "public_key": parts[0],
+                        "preshared_key": parts[1] if parts[1] != "(none)" else None,
+                        "allowed_ips": parts[3],
+                    }
+                )
+
+            return peers
+        except subprocess.CalledProcessError as e:
+            logger.error("Failed to read configured peers", exc_info=True)
+            return []
     
     def get_connected_peers(self) -> Dict[str, Dict]:
         """Get list of connected peers with their statistics"""
@@ -167,7 +219,7 @@ PersistentKeepalive = 25
             
             return peers
         except subprocess.CalledProcessError as e:
-            print(f"Failed to get connected peers: {e}")
+            logger.error("Failed to get connected peers", exc_info=True)
             return {}
 
 # Singleton instance

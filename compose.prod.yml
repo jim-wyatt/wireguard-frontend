@@ -1,10 +1,9 @@
-# Production Docker Compose with optimized builds
+# Production Compose with optimized builds (Podman Compose compatible)
 
 services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
     environment:
       DATABASE_URL: ${DATABASE_URL}
       WG_INTERFACE: ${WG_INTERFACE}
@@ -20,13 +19,17 @@ services:
     volumes:
       - /etc/wireguard:/etc/wireguard
     restart: always
+    cap_drop:
+      - ALL
     cap_add:
       - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
     command: ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"]
     network_mode: "host"
 
   caddy:
-    image: caddy:2-alpine
+    image: docker.io/library/caddy:2-alpine
     network_mode: "host"
     environment:
       DOMAIN: ${DOMAIN}

@@ -4,6 +4,24 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.js',
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'json-summary'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.{js,jsx}'],
+      exclude: ['src/test/**', 'src/__tests__/**', 'src/main.jsx', 'dist/**'],
+      thresholds: {
+        lines: 40,
+        statements: 40,
+        functions: 30,
+        branches: 50,
+      },
+    },
+  },
   build: {
     rollupOptions: {
       output: {

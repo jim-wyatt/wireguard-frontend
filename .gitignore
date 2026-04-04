@@ -59,6 +59,14 @@ wg_configs/
 logs/
 *.log
 
+# Test and coverage artifacts
+coverage/
+frontend/coverage/
+backend/htmlcov/
+backend/.coverage
+.pytest_cache/
+backend/.pytest_cache/
+
 # OS
 .DS_Store
 Thumbs.db

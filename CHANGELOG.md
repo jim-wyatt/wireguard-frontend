@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 - Real-time connected clients monitoring
 - Dashboard with statistics
 - Caddy reverse proxy setup
-- Docker and Docker Compose configuration
+- Container and compose configuration
 - Complete documentation
 - Setup and deployment scripts
 - PostgreSQL and SQLite support
@@ -31,13 +31,13 @@ All notable changes to this project will be documented in this file.
 - ✅ Real-time connection status
 - ✅ Material Design UI
 - ✅ Responsive layout
-- ✅ Docker-based deployment
+- ✅ Container-based deployment
 
 ### Security
 - HTTPS by default with automatic certificate management
 - Security headers configured in Caddy
 - IP forwarding and NAT for VPN traffic
-- Isolated Docker network
+- Isolated service network
 - Environment-based configuration
 
 ### Known Limitations

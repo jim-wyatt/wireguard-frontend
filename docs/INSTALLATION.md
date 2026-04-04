@@ -38,20 +38,14 @@ Update the following values:
 - `WG_SERVER_PRIVATE_KEY`: From step 1
 - `WG_SERVER_ENDPOINT`: Your domain:443
 - `API_SECRET_KEY`: Generate with `openssl rand -hex 32`
+- `API_AUTH_TOKEN`: Generate with `openssl rand -hex 32`
 
-### 3. Install Docker and Docker Compose
+### 3. Install Podman and Podman Compose
 
 ```bash
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker $USER
-
-# Install Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-
-# Log out and back in for group changes to take effect
+# Install Podman and compose wrapper
+sudo apt update
+sudo apt install -y podman podman-compose
 ```
 
 ### 4. Deploy Application
@@ -60,7 +54,7 @@ For development:
 ```bash
 chmod +x scripts/dev-setup.sh
 ./scripts/dev-setup.sh
-docker-compose up -d
+podman compose up -d
 ```
 
 The development setup script automatically installs `nvm` (if missing) and the latest Node LTS before running frontend `npm` commands.
@@ -77,7 +71,7 @@ The production deployment script also ensures `nvm` + latest Node LTS are instal
 
 Check that all services are running:
 ```bash
-docker-compose ps
+podman compose ps
 ```
 
 Check WireGuard status:
@@ -117,10 +111,15 @@ sudo journalctl -u wg-quick@wg0 -n 50
 
 Ensure the backend container has proper permissions:
 ```bash
-docker-compose logs backend
+podman compose logs backend
 ```
 
-The backend needs `NET_ADMIN` capability and access to `/etc/wireguard`.
+The backend runs in a container but mutates host WireGuard via:
+- host network mode
+- `NET_ADMIN` capability
+- bind mount to `/etc/wireguard`
+
+This keeps the VPN endpoint on the host kernel/interface while the app itself stays containerized.
 
 ### Database connection issues
 
@@ -146,15 +145,15 @@ Traffic model:
 
 Check Caddy logs:
 ```bash
-docker-compose logs caddy
+podman compose logs caddy
 ```
 
 ## Updating
 
 ```bash
 git pull
-docker-compose down
-docker-compose up -d --build
+podman compose down
+podman compose up -d --build
 ```
 
 ## Backup
@@ -162,7 +161,7 @@ docker-compose up -d --build
 ### Database Backup
 
 ```bash
-docker-compose exec db pg_dump -U wireguard wireguard > backup.sql
+podman compose exec db pg_dump -U wireguard wireguard > backup.sql
 ```
 
 ### WireGuard Configuration Backup
@@ -174,17 +173,23 @@ sudo cp -r /etc/wireguard /root/wireguard-backup-$(date +%Y%m%d)
 ## Security Recommendations
 
 1. Change default passwords in `.env`
-2. Keep system and Docker images updated
+2. Keep system and Podman images updated
 3. Enable automatic security updates
 4. Use strong API secret keys
 5. Regularly review connected clients
 6. Monitor logs for suspicious activity
 7. Consider implementing rate limiting
 8. Use fail2ban for additional protection
+9. Never embed `API_AUTH_TOKEN` in frontend build variables
+10. For admin browser sessions, set a temporary token at runtime:
+
+```js
+localStorage.setItem('apiToken', '<API_AUTH_TOKEN>')
+```
 
 ## Support
 
 For issues and questions:
-- Check logs: `docker-compose logs`
+- Check logs: `podman compose logs`
 - Review WireGuard status: `sudo wg show`
 - Check firewall rules: `sudo ufw status`
