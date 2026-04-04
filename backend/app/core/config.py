@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     AUTH_FAIL_RATE_LIMIT_PER_MINUTE: int = 12
     AUTH_FAIL_BLOCK_SECONDS: int = 300
     ENABLE_API_DOCS: bool = False
-    WG_CONNECTED_TIMEOUT_SECONDS: int = 25  # Consider peer connected if handshake within keepalive window
+    WG_CONNECTED_TIMEOUT_SECONDS: int = 120  # Mobile peers can miss keepalives briefly; allow a 2-minute window
 
     def cors_origins_list(self) -> List[str]:
         raw = (self.CORS_ORIGINS or "").strip()
