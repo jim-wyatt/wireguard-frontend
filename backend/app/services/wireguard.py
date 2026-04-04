@@ -3,7 +3,7 @@ import ipaddress
 import logging
 import re
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.config import settings
 
 
@@ -212,7 +212,7 @@ PersistentKeepalive = 25
                     peers[public_key] = {
                         "endpoint": endpoint,
                         "allowed_ips": allowed_ips,
-                        "last_handshake": datetime.fromtimestamp(last_handshake) if last_handshake else None,
+                        "last_handshake": datetime.fromtimestamp(last_handshake, tz=timezone.utc) if last_handshake else None,
                         "transfer_rx": transfer_rx,
                         "transfer_tx": transfer_tx
                     }

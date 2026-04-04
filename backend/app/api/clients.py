@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import logging
 
 from app.db.database import get_db
@@ -129,9 +129,20 @@ async def get_stats(
     total_clients = db.query(Client).count()
     active_clients = db.query(Client).filter(Client.is_active == True).count()
     
-    # Get connected clients from WireGuard
+    # Get connected clients from WireGuard with timeout check
     connected_peers = wireguard_service.get_connected_peers()
-    connected_clients = len(connected_peers)
+    
+    # Calculate connection timeout threshold (consistent with get_connected_clients)
+    now = datetime.now(timezone.utc)
+    timeout_threshold = now - timedelta(seconds=settings.WG_CONNECTED_TIMEOUT_SECONDS)
+    
+    # Count only peers with recent handshakes
+    connected_clients = sum(
+        1 for peer in connected_peers.values()
+        if peer.get("last_handshake") and peer["last_handshake"] > timeout_threshold
+    )
+    
+    logger.info(f"Stats: total={total_clients}, active={active_clients}, wg_peers={len(connected_peers)}, connected={connected_clients}")
     
     return ClientStats(
         total_clients=total_clients,
@@ -145,8 +156,6 @@ async def get_connected_clients(
     _: None = Depends(dashboard_rate_limit),
 ):
     """Get list of currently connected clients"""
-    from datetime import datetime, timezone, timedelta
-    
     # Get connected peers from WireGuard
     connected_peers = wireguard_service.get_connected_peers()
     
