@@ -48,10 +48,9 @@ def main():
     json.loads(body)
     checks.append("public stats 200")
 
-    status, body = request("/api/clients/connected", "GET")
-    assert_status("public connected", status, 200)
-    json.loads(body)
-    checks.append("public connected 200")
+    status, _ = request("/api/clients/connected", "GET")
+    assert_status("protected connected list without auth", status, 401)
+    checks.append("protected connected list rejects unauthenticated")
 
     status, _ = request("/api/clients", "GET")
     assert_status("protected clients list without auth", status, 401)
@@ -64,6 +63,16 @@ def main():
         assert_status("protected clients list with auth", status, 200)
         json.loads(body)
         checks.append("protected list accepts operator token")
+
+        status, body = request("/api/clients/connected", "GET", token=API_TOKEN)
+        assert_status("protected connected list with auth", status, 200)
+        json.loads(body)
+        checks.append("protected connected list accepts operator token")
+
+        status, body = request("/api/attestation/summary", "GET", token=API_TOKEN)
+        assert_status("attestation summary with auth", status, 200)
+        json.loads(body)
+        checks.append("attestation summary available with operator token")
 
     print("SMOKE TESTS PASSED")
     for item in checks:

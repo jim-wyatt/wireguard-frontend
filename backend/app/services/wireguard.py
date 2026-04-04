@@ -222,5 +222,69 @@ PersistentKeepalive = 25
             logger.error("Failed to get connected peers", exc_info=True)
             return {}
 
+    def get_interface_summary(self) -> Dict[str, Optional[object]]:
+        """Return live interface state and peer counts for attestation and dashboards."""
+        summary: Dict[str, Optional[object]] = {
+            "interface": self.interface,
+            "is_up": False,
+            "listen_port": None,
+            "public_key": None,
+            "network": self.network,
+            "server_ip": self.server_ip,
+            "server_endpoint": self.server_endpoint,
+            "dns": self.dns,
+            "configured_peers": 0,
+            "connected_peers": 0,
+            "latest_handshake": None,
+            "transfer_rx": 0,
+            "transfer_tx": 0,
+        }
+
+        try:
+            subprocess.run(
+                ["ip", "link", "show", self.interface],
+                capture_output=True,
+                check=True,
+                text=True,
+            )
+            summary["is_up"] = True
+        except subprocess.CalledProcessError:
+            return summary
+
+        try:
+            result = subprocess.run(
+                ["wg", "show", self.interface, "listen-port", "public-key"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+            if len(lines) >= 1:
+                summary["listen_port"] = int(lines[0])
+            if len(lines) >= 2:
+                summary["public_key"] = lines[1]
+        except (subprocess.CalledProcessError, ValueError):
+            logger.warning("Failed to read WireGuard interface metadata", exc_info=True)
+
+        configured_peers = self.get_configured_peers()
+        connected_peers = self.get_connected_peers()
+        summary["configured_peers"] = len(configured_peers)
+        summary["connected_peers"] = len(connected_peers)
+
+        latest_handshake = None
+        transfer_rx = 0
+        transfer_tx = 0
+        for peer in connected_peers.values():
+            handshake = peer.get("last_handshake")
+            if handshake and (latest_handshake is None or handshake > latest_handshake):
+                latest_handshake = handshake
+            transfer_rx += int(peer.get("transfer_rx") or 0)
+            transfer_tx += int(peer.get("transfer_tx") or 0)
+
+        summary["latest_handshake"] = latest_handshake
+        summary["transfer_rx"] = transfer_rx
+        summary["transfer_tx"] = transfer_tx
+        return summary
+
 # Singleton instance
 wireguard_service = WireGuardService()

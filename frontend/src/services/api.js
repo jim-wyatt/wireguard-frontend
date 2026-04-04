@@ -65,14 +65,14 @@ export const clientsApi = {
   // Toggle client status
   toggleClientStatus: (id) => api.patch(`/clients/${id}/toggle`),
 
-  // Stream Caddy access log lines.
-  streamCaddyAccessLog: async ({ signal, tail = 100, onLine }) => {
+  // Stream log lines from a selected source.
+  streamLogs: async ({ signal, source = 'caddy', tail = 100, onLine }) => {
     const token = (window.localStorage.getItem('apiToken') || '').trim();
     const headers = token
       ? { Authorization: `Bearer ${token}` }
       : {};
 
-    const response = await fetch(`${API_BASE_URL}/logs/caddy/access/stream?tail=${tail}&_ts=${Date.now()}`, {
+    const response = await fetch(`${API_BASE_URL}/logs/stream?source=${encodeURIComponent(source)}&tail=${tail}&_ts=${Date.now()}`, {
       method: 'GET',
       headers,
       cache: 'no-store',
@@ -107,6 +107,19 @@ export const clientsApi = {
 
     if (buffer.length > 0) onLine(buffer);
   },
+
+  // Backward-compatible caddy stream helper.
+  streamCaddyAccessLog: async ({ signal, tail = 100, onLine }) =>
+    clientsApi.streamLogs({ signal, source: 'caddy', tail, onLine }),
+
+  // Security and supply-chain attestation summary.
+  getAttestationSummary: () => api.get('/attestation/summary', {
+    params: { _ts: Date.now() },
+    headers: {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+  }),
 };
 
 export default api;

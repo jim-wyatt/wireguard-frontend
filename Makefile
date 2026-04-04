@@ -2,6 +2,7 @@
 
 CONTAINER_ENGINE ?= podman
 COMPOSE ?= $(CONTAINER_ENGINE) compose
+PROD_COMPOSE ?= sudo podman-compose
 
 help:
 	@echo "WireGuard Management - Available Commands"
@@ -46,16 +47,16 @@ prod-build:
 	@echo "Building production images..."
 	chmod +x scripts/ensure-node-lts.sh
 	bash -c 'source scripts/ensure-node-lts.sh && cd frontend && npm install && npm run build'
-	$(COMPOSE) -f compose.prod.yml build
+	$(PROD_COMPOSE) -f compose.prod.yml build
 
 prod-up:
 	@echo "Starting production environment..."
 	chmod +x scripts/deploy-prod.sh
-	./scripts/deploy-prod.sh
+	PROD_COMPOSE_CMD="$(PROD_COMPOSE)" ./scripts/deploy-prod.sh
 
 prod-down:
 	@echo "Stopping production environment..."
-	$(COMPOSE) -f compose.prod.yml down
+	$(PROD_COMPOSE) -f compose.prod.yml down
 
 logs:
 	$(COMPOSE) logs -f

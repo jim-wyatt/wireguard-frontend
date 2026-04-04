@@ -19,10 +19,14 @@ class Settings(BaseSettings):
     WG_NETWORK: str = "10.0.0.0/24"
     WG_DNS: str = "1.1.1.1,8.8.8.8"
     CADDY_ACCESS_LOG_PATH: str = "/var/log/caddy/access.log"
+    APP_LOG_PATH: str = "/var/log/wg/backend.log"
+    SYSTEM_LOG_PATH: str = "/host/var/log/syslog"
+    SECURITY_REPORTS_DIR: str = "/app/docs/security"
     
     # API
     API_SECRET_KEY: str = "change-this-secret-key"
     API_AUTH_TOKEN: str = ""
+    API_AUTH_TOKENS_JSON: str = ""
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
@@ -48,10 +52,11 @@ class Settings(BaseSettings):
 
     def validate_security_configuration(self) -> None:
         auth_token = (self.API_AUTH_TOKEN or "").strip()
+        auth_tokens_json = (self.API_AUTH_TOKENS_JSON or "").strip()
         api_secret = (self.API_SECRET_KEY or "").strip()
 
-        if not auth_token:
-            raise ValueError("Set API_AUTH_TOKEN before startup")
+        if not auth_token and not auth_tokens_json:
+            raise ValueError("Set API_AUTH_TOKEN or API_AUTH_TOKENS_JSON before startup")
 
         if not api_secret or api_secret == DEFAULT_INSECURE_SECRET:
             raise ValueError("Set a non-default API_SECRET_KEY before startup")

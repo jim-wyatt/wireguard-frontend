@@ -6,6 +6,8 @@ import { useAuth } from './context/AuthContext'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Clients = lazy(() => import('./pages/Clients'))
+const Logs = lazy(() => import('./pages/Logs'))
+const Attestation = lazy(() => import('./pages/Attestation'))
 const Login = lazy(() => import('./pages/Login'))
 const PublicDashboard = lazy(() => import('./pages/PublicDashboard'))
 
@@ -50,6 +52,20 @@ function App() {
               </Suspense>
             </Container>
           } />
+          <Route path="/logs" element={
+            <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+              <Suspense fallback={<PageLoader />}>
+                <Logs />
+              </Suspense>
+            </Container>
+          } />
+          <Route path="/attestation" element={
+            <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+              <Suspense fallback={<PageLoader />}>
+                <Attestation />
+              </Suspense>
+            </Container>
+          } />
         </Route>
       ) : (
         <Route path="/dashboard" element={<Navigate to="/login" replace />} />
@@ -57,6 +73,14 @@ function App() {
 
       {!isAuthenticated && (
         <Route path="/clients" element={<Navigate to="/login" replace />} />
+      )}
+
+      {!isAuthenticated && (
+        <Route path="/logs" element={<Navigate to="/login" replace />} />
+      )}
+
+      {!isAuthenticated && (
+        <Route path="/attestation" element={<Navigate to="/login" replace />} />
       )}
 
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -18,11 +18,16 @@ services:
       API_SECRET_KEY: ${API_SECRET_KEY}
       API_AUTH_TOKEN: ${API_AUTH_TOKEN}
       WG_CONNECTED_TIMEOUT_SECONDS: ${WG_CONNECTED_TIMEOUT_SECONDS:-120}
+      APP_LOG_PATH: /var/log/wg/backend.log
+      SYSTEM_LOG_PATH: /host/var/log/dpkg.log
       CORS_ORIGINS: '["https://${DOMAIN}"]'
     volumes:
       - /etc/wireguard:/etc/wireguard
       - backend_data:/var/lib/wgapp
+      - backend_app_logs:/var/log/wg
       - caddy_logs:/var/log/caddy:ro
+      - /var/log:/host/var/log:ro
+      - ./docs/security:/app/docs/security:ro
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m
     read_only: true
@@ -43,7 +48,7 @@ services:
     network_mode: "host"
 
   caddy:
-    image: docker.io/library/caddy:2-alpine
+    image: docker.io/library/caddy:2.11.2-alpine@sha256:a1b7e624f860619cea121bdbc5dec2e112401666298c6507c6793b0a3ee6fc8e
     network_mode: "host"
     environment:
       DOMAIN: ${DOMAIN}
@@ -80,6 +85,7 @@ services:
 
 volumes:
   backend_data:
+  backend_app_logs:
   caddy_data:
   caddy_config:
   caddy_logs:

@@ -93,6 +93,8 @@ WG_SERVER_PUBLIC_KEY=<your-public-key>
 # API
 API_SECRET_KEY=<generate-a-secure-key>
 API_AUTH_TOKEN=<shared-token-for-protected-api-routes>
+# Optional scoped tokens (writer/public) with optional expiry:
+# API_AUTH_TOKENS_JSON=[{"token":"writer-token","role":"writer"},{"token":"readonly-token","role":"public","expires_at":"2026-12-31T23:59:59Z"}]
 ```
 
 Do not expose `API_AUTH_TOKEN` to browser build variables. For admin actions from the UI, set a temporary session token in browser local storage:

@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 jobs:
   npm-audit:
@@ -56,3 +57,65 @@ jobs:
 
       - name: Audit requirements
         run: pip-audit -r requirements.txt
+
+  trivy-fs:
+    name: Trivy filesystem scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy scan (high/critical)
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-results.sarif
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+      - name: Upload Trivy artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-results-sarif
+          path: trivy-results.sarif
+          if-no-files-found: error
+
+  gitleaks:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom-repo.cdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-sbom-cyclonedx
+          path: sbom-repo.cdx.json
+          if-no-files-found: error

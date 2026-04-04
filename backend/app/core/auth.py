@@ -1,8 +1,10 @@
 import secrets
+import json
 from enum import Enum
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict, deque
 from threading import Lock
+from dataclasses import dataclass
 
 from fastapi import Header, HTTPException, Request, status
 
@@ -15,6 +17,13 @@ DEFAULT_INSECURE_SECRET = "change-this-secret-key"
 class Role(str, Enum):
     PUBLIC = "public"
     WRITER = "writer"
+
+
+@dataclass(frozen=True)
+class TokenGrant:
+    token: str
+    role: Role
+    expires_at: datetime | None
 
 
 _auth_fail_lock = Lock()
@@ -64,12 +73,70 @@ def _extract_bearer_token(authorization: str | None) -> str | None:
     return token.strip()
 
 
+def _parse_expiry(raw: str | None) -> datetime | None:
+    if not raw:
+        return None
+    try:
+        normalized = raw.replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def _configured_token_grants() -> list[TokenGrant]:
+    raw_json = (settings.API_AUTH_TOKENS_JSON or "").strip()
+    if raw_json:
+        try:
+            payload = json.loads(raw_json)
+        except json.JSONDecodeError:
+            return []
+
+        if not isinstance(payload, list):
+            return []
+
+        grants: list[TokenGrant] = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+
+            token = str(item.get("token") or "").strip()
+            role_raw = str(item.get("role") or Role.WRITER.value).strip().lower()
+            expires_at = _parse_expiry(item.get("expires_at"))
+
+            if not token:
+                continue
+
+            role = Role.WRITER if role_raw == Role.WRITER.value else Role.PUBLIC
+            grants.append(TokenGrant(token=token, role=role, expires_at=expires_at))
+
+        return grants
+
+    legacy = (settings.API_AUTH_TOKEN or "").strip()
+    if legacy:
+        return [TokenGrant(token=legacy, role=Role.WRITER, expires_at=None)]
+    return []
+
+
+def _match_token_grant(provided: str) -> TokenGrant | None:
+    now = datetime.now(timezone.utc)
+    for grant in _configured_token_grants():
+        if not secrets.compare_digest(provided, grant.token):
+            continue
+        if grant.expires_at and grant.expires_at <= now:
+            return None
+        return grant
+    return None
+
+
 async def require_api_auth(
     request: Request,
     authorization: str | None = Header(default=None),
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
 ) -> None:
-    expected = (settings.API_AUTH_TOKEN or "").strip()
+    grants = _configured_token_grants()
     provided = (x_api_key or _extract_bearer_token(authorization) or "").strip()
     client_ip = request.client.host if request.client else "unknown"
 
@@ -79,13 +146,15 @@ async def require_api_auth(
             detail="Too many failed authentication attempts. Try again later.",
         )
 
-    if not expected:
+    if not grants:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="API authentication secret is not configured",
         )
 
-    if not expected or not provided or not secrets.compare_digest(provided, expected):
+    matched_grant = _match_token_grant(provided) if provided else None
+
+    if not matched_grant:
         # Only track failures when a credential was provided; anonymous requests should not trigger lockout.
         if provided:
             _record_auth_failure(client_ip)
@@ -96,6 +165,7 @@ async def require_api_auth(
         )
 
     _reset_auth_failures(client_ip)
+    request.state.auth_role = matched_grant.role.value
 
 
 async def require_writer_role(
@@ -104,3 +174,9 @@ async def require_writer_role(
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
 ) -> None:
     await require_api_auth(request=request, authorization=authorization, x_api_key=x_api_key)
+    role = getattr(request.state, "auth_role", Role.PUBLIC.value)
+    if role != Role.WRITER.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Writer role required",
+        )

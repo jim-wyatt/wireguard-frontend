@@ -21,6 +21,8 @@ import {
 import MenuIcon from '@mui/icons-material/Menu'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import PeopleIcon from '@mui/icons-material/People'
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
+import PolicyIcon from '@mui/icons-material/Policy'
 import VpnKeyIcon from '@mui/icons-material/VpnKey'
 import LogoutIcon from '@mui/icons-material/Logout'
 import DarkModeIcon from '@mui/icons-material/DarkMode'
@@ -65,6 +67,8 @@ function Layout() {
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
     { text: 'Clients', icon: <PeopleIcon />, path: '/clients' },
+    { text: 'Logs', icon: <ReceiptLongIcon />, path: '/logs' },
+    { text: 'Attestation', icon: <PolicyIcon />, path: '/attestation' },
   ]
 
   const drawer = (

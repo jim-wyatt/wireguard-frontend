@@ -7,10 +7,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# Ensure importing the app never touches the default local database path.
-os.environ.setdefault("DATABASE_URL", "sqlite:///./test_wireguard.db")
-os.environ.setdefault("API_SECRET_KEY", "test-secret-key")
-os.environ.setdefault("ENABLE_API_DOCS", "true")
+# Ensure tests never inherit host/prod env values.
+os.environ["DATABASE_URL"] = "sqlite:///./test_wireguard.db"
+os.environ["API_SECRET_KEY"] = "test-secret-key"
+os.environ["API_AUTH_TOKEN"] = "test-secret-key"
+os.environ["ENABLE_API_DOCS"] = "true"
+os.environ["APP_LOG_PATH"] = "/tmp/wg-backend-test.log"
 
 from app.db.database import Base, get_db
 from app.main import app

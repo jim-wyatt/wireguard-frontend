@@ -1,0 +1,19 @@
+# Dependency and build artifacts
+node_modules/
+dist/
+coverage/
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# VCS/editor noise
+.git/
+.gitignore
+.vscode/
+
+# Environment and local files
+.env
+.env.*
+npm-debug.log*
+*.log

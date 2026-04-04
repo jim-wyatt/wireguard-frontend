@@ -1,0 +1,28 @@
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Test and local data artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+coverage/
+tests/
+*.db
+*.sqlite
+
+# VCS/editor noise
+.git/
+.gitignore
+.vscode/
+
+# Environment and local secrets
+.env
+.env.*
+
+# Build/runtime outputs
+*.log

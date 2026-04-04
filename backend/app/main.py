@@ -5,8 +5,10 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.core.logging_config import configure_logging
 from app.api import clients
 from app.api import logs
+from app.api import attestation
 from app.db.database import engine, Base, SessionLocal
 from app.services.client_sync import sync_clients_with_wireguard
 
@@ -15,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    configure_logging()
     settings.validate_security_configuration()
 
     # Keep schema setup in startup lifecycle rather than import time.
@@ -54,6 +57,7 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(clients.router, prefix="/api", tags=["clients"])
     app.include_router(logs.router, prefix="/api", tags=["logs"])
+    app.include_router(attestation.router, prefix="/api", tags=["attestation"])
 
     @app.get("/")
     async def root():
