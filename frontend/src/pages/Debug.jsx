@@ -1,22 +1,19 @@
-import AnsiToHtml from 'ansi-to-html'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { FitAddon } from '@xterm/addon-fit'
+import { Terminal } from '@xterm/xterm'
 import { Alert, Box, Button, LinearProgress, Paper, Typography } from '@mui/material'
 import { clientsApi } from '../services/api'
 import { useAuth } from '../context/AuthContext'
-
-const converter = new AnsiToHtml({
-  fg: '#b8ffca',
-  bg: '#030704',
-  newline: true,
-  escapeXML: true,
-  stream: false,
-})
+import '@xterm/xterm/css/xterm.css'
 
 function Debug() {
   const { isAuthenticated } = useAuth()
   const [payload, setPayload] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const terminalHostRef = useRef(null)
+  const terminalRef = useRef(null)
+  const fitAddonRef = useRef(null)
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -50,14 +47,60 @@ function Debug() {
   const captureLabel = payload?.captured_at ? new Date(payload.captured_at).toLocaleString() : '-'
   const viewport = payload?.viewport || { columns: '-', rows: '-' }
 
-  const ansiHtml = useMemo(() => {
-    if (!ansiText) return ''
-    try {
-      return converter.toHtml(ansiText)
-    } catch {
-      return ansiText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  useEffect(() => {
+    if (!isAuthenticated || !terminalHostRef.current || terminalRef.current) return
+
+    const term = new Terminal({
+      disableStdin: true,
+      cursorBlink: false,
+      convertEol: false,
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+      fontSize: 11,
+      rows: Number(viewport?.rows) || 52,
+      cols: Number(viewport?.columns) || 214,
+      theme: {
+        background: '#030704',
+        foreground: '#b8ffca',
+        cursor: '#b8ffca',
+      },
+      allowProposedApi: false,
+    })
+
+    const fitAddon = new FitAddon()
+    term.loadAddon(fitAddon)
+    term.open(terminalHostRef.current)
+    fitAddon.fit()
+
+    terminalRef.current = term
+    fitAddonRef.current = fitAddon
+
+    const onResize = () => {
+      fitAddon.fit()
     }
-  }, [ansiText])
+    window.addEventListener('resize', onResize)
+
+    return () => {
+      window.removeEventListener('resize', onResize)
+      term.dispose()
+      terminalRef.current = null
+      fitAddonRef.current = null
+    }
+  }, [isAuthenticated, viewport?.columns, viewport?.rows])
+
+  useEffect(() => {
+    const term = terminalRef.current
+    if (!term) return
+
+    term.reset()
+    term.clear()
+    if (ansiText) {
+      term.write(ansiText)
+    } else if (loading) {
+      term.writeln('Loading btop snapshot...')
+    } else {
+      term.writeln('No snapshot data received.')
+    }
+  }, [ansiText, loading])
 
   if (!isAuthenticated) {
     return (
@@ -92,41 +135,21 @@ function Debug() {
             bgcolor: '#030704',
             border: '1px solid rgba(49, 242, 125, 0.24)',
             borderRadius: 1,
-            p: 1,
+            p: 0.5,
             overflow: 'auto',
             maxHeight: 'calc(100vh - 185px)',
           }}
         >
-          {ansiHtml ? (
-            <Box
-              component="div"
-              dangerouslySetInnerHTML={{ __html: ansiHtml }}
-              sx={{
-                m: 0,
-                fontFamily: 'monospace',
-                fontSize: { xs: '0.6rem', sm: '0.68rem' },
-                lineHeight: 1.12,
-                whiteSpace: 'pre',
-                minWidth: 'max-content',
-                '& span': { fontFamily: 'inherit' },
-              }}
-            />
-          ) : (
-            <Typography
-              component="pre"
-              sx={{
-                m: 0,
-                fontFamily: 'monospace',
-                fontSize: { xs: '0.65rem', sm: '0.72rem' },
-                lineHeight: 1.15,
-                color: '#b8ffca',
-                whiteSpace: 'pre',
-                minWidth: 'max-content',
-              }}
-            >
-              {loading ? 'Loading btop snapshot...' : 'No snapshot data received.'}
-            </Typography>
-          )}
+          <Box
+            ref={terminalHostRef}
+            sx={{
+              width: '100%',
+              minWidth: 'max-content',
+              '.xterm': { padding: 0, margin: 0 },
+              '.xterm-viewport': { overflowY: 'hidden !important' },
+              '.xterm-screen canvas': { imageRendering: 'pixelated' },
+            }}
+          />
         </Box>
       </Paper>
     </Box>

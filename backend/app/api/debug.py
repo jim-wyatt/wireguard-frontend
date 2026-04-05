@@ -2,6 +2,7 @@ import asyncio
 import fcntl
 import os
 import pty
+import re
 import select
 import shutil
 import struct
@@ -11,6 +12,7 @@ import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
+import pyte
 
 from app.core.auth import require_api_auth
 
@@ -88,6 +90,27 @@ def _run_btop_pty() -> str:
     return output.decode("utf-8", errors="replace")
 
 
+def _ansi_to_static_screen(ansi_text: str) -> str:
+    """
+    Render ANSI control sequences into a terminal screen buffer so the frontend
+    can display a static multiline frame without emulating a full terminal.
+    """
+    if not ansi_text:
+        return ""
+
+    try:
+        screen = pyte.Screen(_COLUMNS, _ROWS)
+        stream = pyte.ByteStream(screen)
+        stream.feed(ansi_text)
+        # Keep line boundaries but trim trailing space to reduce payload size.
+        return "\n".join(line.rstrip() for line in screen.display)
+    except Exception:
+        # Fallback: strip ANSI escapes and preserve existing newlines.
+        plain = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", ansi_text)
+        plain = plain.replace("\r", "")
+        return plain
+
+
 # ---------------------------------------------------------------------------
 # Endpoint
 # ---------------------------------------------------------------------------
@@ -96,6 +119,8 @@ def _run_btop_pty() -> str:
 async def system_snapshot() -> dict:
     loop = asyncio.get_running_loop()
     ansi_text = await loop.run_in_executor(None, _run_btop_pty)
+    snapshot_text = _ansi_to_static_screen(ansi_text)
+    snapshot_lines = snapshot_text.splitlines()
     return {
         "captured_at": datetime.now(timezone.utc).isoformat(),
         "refresh_hint_seconds": 5,
@@ -104,6 +129,9 @@ async def system_snapshot() -> dict:
             "rows": _ROWS,
         },
         "ansi_text": ansi_text,
+        "snapshot_text": snapshot_text,
+        "snapshot_lines": snapshot_lines,
+        "line_count": len(snapshot_lines),
     }
 
 
