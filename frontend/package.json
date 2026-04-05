@@ -19,6 +19,7 @@
     "@mui/icons-material": "^7.3.9",
     "@mui/material": "^7.3.9",
     "@mui/x-data-grid": "^8.28.2",
+    "ansi-to-html": "^0.7.2",
     "axios": "^1.14.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -26,12 +27,13 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.59.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
-    "@playwright/test": "^1.59.1",
+    "@vitest/coverage-v8": "^4.1.2",
     "eslint": "^9.39.1",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
@@ -39,7 +41,6 @@
     "globals": "^17.4.0",
     "jsdom": "^29.0.1",
     "vite": "^8.0.3",
-    "@vitest/coverage-v8": "^4.1.2",
     "vitest": "^4.1.2"
   }
 }

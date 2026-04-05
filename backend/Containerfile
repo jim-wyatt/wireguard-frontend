@@ -5,9 +5,9 @@ WORKDIR /app
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=${GIT_COMMIT}
 
-# Install WireGuard tools
+# Install WireGuard tools and btop (for debug PTY snapshot)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends wireguard-tools iproute2 && \
+    apt-get install -y --no-install-recommends wireguard-tools iproute2 btop && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirements

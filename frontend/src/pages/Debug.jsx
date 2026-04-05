@@ -1,7 +1,16 @@
-import { useEffect, useState } from 'react'
+import AnsiToHtml from 'ansi-to-html'
+import { useEffect, useMemo, useState } from 'react'
 import { Alert, Box, Button, LinearProgress, Paper, Typography } from '@mui/material'
 import { clientsApi } from '../services/api'
 import { useAuth } from '../context/AuthContext'
+
+const converter = new AnsiToHtml({
+  fg: '#b8ffca',
+  bg: '#030704',
+  newline: true,
+  escapeXML: true,
+  stream: false,
+})
 
 function Debug() {
   const { isAuthenticated } = useAuth()
@@ -37,9 +46,18 @@ function Debug() {
     }
   }, [isAuthenticated])
 
-  const snapshotText = payload?.snapshot_text || ''
+  const ansiText = payload?.ansi_text || ''
   const captureLabel = payload?.captured_at ? new Date(payload.captured_at).toLocaleString() : '-'
   const viewport = payload?.viewport || { columns: '-', rows: '-' }
+
+  const ansiHtml = useMemo(() => {
+    if (!ansiText) return ''
+    try {
+      return converter.toHtml(ansiText)
+    } catch {
+      return ansiText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
+  }, [ansiText])
 
   if (!isAuthenticated) {
     return (
@@ -66,7 +84,7 @@ function Debug() {
         }}
       >
         <Typography variant="caption" sx={{ display: 'block', mb: 0.75, fontFamily: 'monospace' }}>
-          SYSTEM CONSOLE // proc snapshot | {viewport.columns}x{viewport.rows} | {captureLabel} | refresh 5s
+          SYSTEM CONSOLE // btop snapshot | {viewport.columns}×{viewport.rows} | {captureLabel} | refresh 5s
         </Typography>
 
         <Box
@@ -75,25 +93,40 @@ function Debug() {
             border: '1px solid rgba(49, 242, 125, 0.24)',
             borderRadius: 1,
             p: 1,
-            overflowX: 'auto',
-            overflowY: 'auto',
+            overflow: 'auto',
             maxHeight: 'calc(100vh - 185px)',
           }}
         >
-          <Typography
-            component="pre"
-            sx={{
-              m: 0,
-              fontFamily: 'monospace',
-              fontSize: { xs: '0.65rem', sm: '0.72rem' },
-              lineHeight: 1.15,
-              color: '#b8ffca',
-              whiteSpace: 'pre',
-              minWidth: 'max-content',
-            }}
-          >
-            {snapshotText || (loading ? 'Loading system snapshot...' : 'No snapshot data received.')}
-          </Typography>
+          {ansiHtml ? (
+            <Box
+              component="div"
+              dangerouslySetInnerHTML={{ __html: ansiHtml }}
+              sx={{
+                m: 0,
+                fontFamily: 'monospace',
+                fontSize: { xs: '0.6rem', sm: '0.68rem' },
+                lineHeight: 1.12,
+                whiteSpace: 'pre',
+                minWidth: 'max-content',
+                '& span': { fontFamily: 'inherit' },
+              }}
+            />
+          ) : (
+            <Typography
+              component="pre"
+              sx={{
+                m: 0,
+                fontFamily: 'monospace',
+                fontSize: { xs: '0.65rem', sm: '0.72rem' },
+                lineHeight: 1.15,
+                color: '#b8ffca',
+                whiteSpace: 'pre',
+                minWidth: 'max-content',
+              }}
+            >
+              {loading ? 'Loading btop snapshot...' : 'No snapshot data received.'}
+            </Typography>
+          )}
         </Box>
       </Paper>
     </Box>
