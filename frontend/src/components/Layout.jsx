@@ -19,6 +19,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import PolicyIcon from '@mui/icons-material/Policy'
 import QueryStatsIcon from '@mui/icons-material/QueryStats'
 import TerminalIcon from '@mui/icons-material/Terminal'
+import BugReportIcon from '@mui/icons-material/BugReport'
 import VpnKeyIcon from '@mui/icons-material/VpnKey'
 import LogoutIcon from '@mui/icons-material/Logout'
 import LoginIcon from '@mui/icons-material/Login'
@@ -37,21 +38,23 @@ function Layout() {
 
   const navItems = [
     { text: 'Dash', icon: <DashboardIcon fontSize="small" />, path: '/dashboard' },
-    { text: 'Clients', icon: <PeopleIcon fontSize="small" />, path: '/clients' },
+    { text: 'Nodes', icon: <PeopleIcon fontSize="small" />, path: '/nodes' },
     { text: 'Logs', icon: <ReceiptLongIcon fontSize="small" />, path: '/logs' },
     { text: 'Trust', icon: <PolicyIcon fontSize="small" />, path: '/attestation' },
     { text: 'Metrics', icon: <QueryStatsIcon fontSize="small" />, path: '/metrics' },
     { text: 'Ops', icon: <TerminalIcon fontSize="small" />, path: '/operations' },
+    { text: 'Debug', icon: <BugReportIcon fontSize="small" />, path: '/debug' },
   ]
 
   useEffect(() => {
     const navHotkeys = {
       '1': '/dashboard',
-      '2': '/clients',
+      '2': '/nodes',
       '3': '/logs',
       '4': '/attestation',
       '5': '/metrics',
       '6': '/operations',
+      '7': '/debug',
     }
 
     const onKeydown = (event) => {
@@ -95,7 +98,7 @@ function Layout() {
   }, [])
 
   return (
-    <Box sx={{ minHeight: '100vh' }}>
+    <Box sx={{ minHeight: '100vh', width: '100%', maxWidth: '100vw', overflowX: 'clip' }}>
       <AppBar
         position="fixed"
         elevation={0}
@@ -114,8 +117,8 @@ function Layout() {
         <Toolbar variant="dense" sx={{ minHeight: '42px !important' }}>
           <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexGrow: 1 }}>
             <VpnKeyIcon sx={{ fontSize: 18 }} />
-            <Typography variant="subtitle2">WIREGUARD OPS HUD</Typography>
-            <Typography variant="caption" color="text.secondary">| HOTKEYS 1-6</Typography>
+            <Typography variant="subtitle2">TRUSTED EXCHANGE HUB OPS HUD</Typography>
+            <Typography variant="caption" color="text.secondary">| HOTKEYS 1-7</Typography>
             <Typography variant="caption" color="text.secondary">| PAGE {location.pathname}</Typography>
           </Stack>
 
@@ -151,7 +154,7 @@ function Layout() {
         </Toolbar>
       </AppBar>
 
-      <Box component="main" sx={{ px: 1.5, pt: 7.5, pb: 9.5 }}>
+      <Box component="main" sx={{ px: { xs: 1, sm: 1.5 }, pt: 7.5, pb: 9.5, width: '100%', maxWidth: '100%', overflowX: 'clip' }}>
         <Outlet />
       </Box>
 
@@ -167,12 +170,13 @@ function Layout() {
           borderRadius: 1,
           bgcolor: 'background.paper',
           border: '1px solid rgba(49, 242, 125, 0.28)',
+          overflowX: 'hidden',
           opacity: dockVisible ? 1 : 0,
           pointerEvents: dockVisible ? 'auto' : 'none',
           transition: 'opacity 160ms ease',
         }}
       >
-        <Stack direction="row" spacing={0.5} justifyContent="space-between" useFlexGap>
+        <Stack direction="row" spacing={0.25} justifyContent="space-between" useFlexGap sx={{ minWidth: 0 }}>
           {navItems.map((item) => {
             const active = location.pathname === item.path
             return (
@@ -181,16 +185,17 @@ function Layout() {
                   size="small"
                   onClick={() => navigate(item.path)}
                   sx={{
-                    px: 1.15,
+                    px: { xs: 0.5, sm: 1.15 },
                     py: 0.45,
                     borderRadius: 1,
+                    minWidth: 0,
                     border: active ? '1px solid rgba(49,242,125,0.45)' : '1px solid transparent',
                     bgcolor: active ? 'rgba(49,242,125,0.12)' : 'transparent',
                   }}
                 >
-                  <Stack direction="row" spacing={0.45} alignItems="center">
+                  <Stack direction="row" spacing={0.35} alignItems="center" sx={{ minWidth: 0 }}>
                     {item.icon}
-                    <Typography variant="caption">{item.text}</Typography>
+                    <Typography variant="caption" sx={{ display: { xs: 'none', sm: 'block' } }}>{item.text}</Typography>
                   </Stack>
                 </IconButton>
               </Tooltip>

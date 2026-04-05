@@ -15,7 +15,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import DownloadIcon from '@mui/icons-material/Download'
 import { clientsApi } from '../services/api'
 
-function ClientConfigDialog({ open, onClose, clientId, clientEmail }) {
+function NodeConfigDialog({ open, onClose, nodeId, nodeEmail }) {
   const [config, setConfig] = useState(null)
   const [qrCode, setQrCode] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -26,7 +26,7 @@ function ClientConfigDialog({ open, onClose, clientId, clientEmail }) {
     setLoading(true)
     setError(null)
     try {
-      const response = await clientsApi.getClientConfig(clientId)
+      const response = await clientsApi.getClientConfig(nodeId)
       setConfig(response.data.config)
       setQrCode(response.data.qr_code)
     } catch (err) {
@@ -34,13 +34,13 @@ function ClientConfigDialog({ open, onClose, clientId, clientEmail }) {
     } finally {
       setLoading(false)
     }
-  }, [clientId])
+  }, [nodeId])
 
   useEffect(() => {
-    if (open && clientId) {
+    if (open && nodeId) {
       loadConfig()
     }
-  }, [open, clientId, loadConfig])
+  }, [open, nodeId, loadConfig])
 
   const handleCopy = () => {
     navigator.clipboard.writeText(config)
@@ -53,14 +53,14 @@ function ClientConfigDialog({ open, onClose, clientId, clientEmail }) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${clientEmail || 'client'}.conf`
+    a.download = `${nodeEmail || 'node'}.conf`
     a.click()
     URL.revokeObjectURL(url)
   }
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>Client Configuration</DialogTitle>
+      <DialogTitle>Node Configuration</DialogTitle>
       <DialogContent>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -113,4 +113,4 @@ function ClientConfigDialog({ open, onClose, clientId, clientEmail }) {
   )
 }
 
-export default ClientConfigDialog
+export default NodeConfigDialog

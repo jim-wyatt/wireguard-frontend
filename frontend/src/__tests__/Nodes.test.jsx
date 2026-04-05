@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import Clients from '../pages/Clients'
+import Nodes from '../pages/Nodes'
 import { clientsApi } from '../services/api'
 
 vi.mock('../services/api', () => ({
@@ -14,13 +14,13 @@ vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({ isAuthenticated: true }),
 }))
 
-vi.mock('../components/CreateClientDialog', () => ({
+vi.mock('../components/CreateNodeDialog', () => ({
   default: ({ open }) => (open ? <div data-testid="create-client-dialog">Create Dialog</div> : null),
 }))
 
-vi.mock('../components/ClientConfigDialog', () => ({
-  default: ({ open, clientEmail }) =>
-    open ? <div data-testid="client-config-dialog">Config Dialog {clientEmail}</div> : null,
+vi.mock('../components/NodeConfigDialog', () => ({
+  default: ({ open, nodeEmail }) =>
+    open ? <div data-testid="client-config-dialog">Config Dialog {nodeEmail}</div> : null,
 }))
 
 vi.mock('@mui/x-data-grid', () => ({
@@ -44,13 +44,13 @@ vi.mock('@mui/x-data-grid', () => ({
   },
 }))
 
-describe('Clients page', () => {
+describe('Nodes page', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubGlobal('confirm', vi.fn(() => true))
   })
 
-  it('loads clients on mount and renders row data', async () => {
+  it('loads nodes on mount and renders row data', async () => {
     clientsApi.getClients.mockResolvedValue({
       data: [
         {
@@ -65,7 +65,7 @@ describe('Clients page', () => {
       ],
     })
 
-    render(<Clients />)
+    render(<Nodes />)
 
     await waitFor(() => {
       expect(clientsApi.getClients).toHaveBeenCalledTimes(1)
@@ -75,7 +75,7 @@ describe('Clients page', () => {
     expect(screen.getByText('Rows: 1')).toBeInTheDocument()
   })
 
-  it('deletes a client and shows success message', async () => {
+  it('deletes a node and shows success message', async () => {
     clientsApi.getClients.mockResolvedValue({
       data: [
         {
@@ -91,7 +91,7 @@ describe('Clients page', () => {
     })
     clientsApi.deleteClient.mockResolvedValue({})
 
-    render(<Clients />)
+    render(<Nodes />)
 
     await screen.findByText('alice@example.com')
 
@@ -101,10 +101,10 @@ describe('Clients page', () => {
       expect(clientsApi.deleteClient).toHaveBeenCalledWith(1)
     })
 
-    expect(await screen.findByText('Client deleted successfully')).toBeInTheDocument()
+    expect(await screen.findByText('Node deleted successfully')).toBeInTheDocument()
   })
 
-  it('toggles a client and shows status message', async () => {
+  it('toggles a node and shows status message', async () => {
     clientsApi.getClients.mockResolvedValue({
       data: [
         {
@@ -120,7 +120,7 @@ describe('Clients page', () => {
     })
     clientsApi.toggleClientStatus.mockResolvedValue({})
 
-    render(<Clients />)
+    render(<Nodes />)
 
     await screen.findByText('alice@example.com')
 
@@ -130,7 +130,7 @@ describe('Clients page', () => {
       expect(clientsApi.toggleClientStatus).toHaveBeenCalledWith(1)
     })
 
-    expect(await screen.findByText('Client status updated')).toBeInTheDocument()
+    expect(await screen.findByText('Node status updated')).toBeInTheDocument()
   })
 
   it('opens create and config dialogs', async () => {
@@ -148,14 +148,14 @@ describe('Clients page', () => {
       ],
     })
 
-    render(<Clients />)
+    render(<Nodes />)
 
     await screen.findByText('alice@example.com')
 
-    fireEvent.click(screen.getByText('Create Client'))
+    fireEvent.click(screen.getByText('Create Node'))
     expect(screen.getByTestId('create-client-dialog')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByTitle('Download Config'))
+    fireEvent.click(screen.getByTitle('Download Node Config'))
     expect(screen.getByTestId('client-config-dialog')).toHaveTextContent('alice@example.com')
   })
 })

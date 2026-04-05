@@ -39,13 +39,26 @@ function buildTheme(matrixMode) {
       components: {
         MuiCssBaseline: {
           styleOverrides: {
+            html: {
+              width: '100%',
+              maxWidth: '100%',
+              overflowX: 'clip',
+            },
             body: {
+              width: '100%',
+              maxWidth: '100%',
+              overflowX: 'clip',
               backgroundImage: [
                 'linear-gradient(rgba(49,242,125,0.035) 1px, transparent 1px)',
                 'linear-gradient(90deg, rgba(49,242,125,0.03) 1px, transparent 1px)',
                 'radial-gradient(circle at 15% 20%, rgba(25,199,255,0.08), transparent 30%)',
               ].join(','),
               backgroundSize: '24px 24px, 24px 24px, 100% 100%',
+            },
+            '#root': {
+              width: '100%',
+              maxWidth: '100%',
+              overflowX: 'clip',
             },
           },
         },
@@ -95,7 +108,15 @@ function buildTheme(matrixMode) {
     components: {
       MuiCssBaseline: {
         styleOverrides: {
+          html: {
+            width: '100%',
+            maxWidth: '100%',
+            overflowX: 'clip',
+          },
           body: {
+            width: '100%',
+            maxWidth: '100%',
+            overflowX: 'clip',
             backgroundImage: [
               'linear-gradient(rgba(0,255,102,0.045) 1px, transparent 1px)',
               'linear-gradient(90deg, rgba(0,255,102,0.03) 1px, transparent 1px)',
@@ -103,6 +124,11 @@ function buildTheme(matrixMode) {
               'radial-gradient(circle at 80% 90%, rgba(0,255,102,0.08), transparent 30%)',
             ].join(','),
             backgroundSize: '24px 24px, 24px 24px, 100% 100%, 100% 100%',
+          },
+          '#root': {
+            width: '100%',
+            maxWidth: '100%',
+            overflowX: 'clip',
           },
         },
       },

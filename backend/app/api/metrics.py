@@ -7,6 +7,7 @@ import os
 import platform
 import socket
 import sys
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -23,6 +24,21 @@ _METRIC_LINE_RE = re.compile(
 )
 _LABEL_RE = re.compile(r'(\w+)="((?:\\.|[^"])*)"')
 _LAST_CPU_SNAPSHOT: tuple[int, int] | None = None
+_SIDECAR_CACHE: dict[str, dict] = {}
+
+_SIDECAR_TTL_SECONDS = {
+    # High-value volatile telemetry: refresh frequently.
+    "node_exporter": 20.0,
+    "podman_exporter": 20.0,
+    "postgres_exporter": 25.0,
+    "falcosidekick": 25.0,
+    # Medium volatility operational health.
+    "parca": 45.0,
+    "ebpf_agent": 45.0,
+    # Lower volatility control/metadata endpoints.
+    "crowdsec": 90.0,
+    "trivy_server": 180.0,
+}
 
 
 def _to_float(raw: str) -> float:
@@ -625,6 +641,120 @@ def _probe_source(url: str, timeout_seconds: float = 3.0) -> dict:
         }
 
 
+def _probe_endpoint_detail(
+    url: str,
+    *,
+    timeout_seconds: float = 3.0,
+    expect_json: bool = False,
+    name: str | None = None,
+) -> dict:
+    endpoint = (url or "").strip()
+    if not endpoint:
+        return {
+            "name": name or "endpoint",
+            "url": endpoint,
+            "available": False,
+            "status_code": None,
+            "latency_ms": None,
+            "content_type": None,
+            "response_bytes": 0,
+            "json": None,
+            "error": "not configured",
+        }
+
+    started = time.monotonic()
+    req = urllib.request.Request(endpoint)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_seconds) as response:
+            body = response.read()
+            latency_ms = (time.monotonic() - started) * 1000.0
+            observed_at = datetime.now(timezone.utc).isoformat()
+            content_type = response.headers.get("Content-Type")
+            json_shape = None
+            parse_error = None
+            if expect_json:
+                try:
+                    parsed_json = json.loads(body.decode("utf-8", errors="replace"))
+                    if isinstance(parsed_json, dict):
+                        json_shape = {
+                            "kind": "object",
+                            "keys": sorted(list(parsed_json.keys()))[:20],
+                            "key_count": len(parsed_json),
+                        }
+                    elif isinstance(parsed_json, list):
+                        json_shape = {
+                            "kind": "array",
+                            "length": len(parsed_json),
+                        }
+                    else:
+                        json_shape = {
+                            "kind": type(parsed_json).__name__,
+                        }
+                except json.JSONDecodeError:
+                    parse_error = "invalid-json"
+
+            return {
+                "name": name or "endpoint",
+                "url": endpoint,
+                "available": 200 <= response.status < 400,
+                "status_code": response.status,
+                "latency_ms": latency_ms,
+                "observed_at": observed_at,
+                "content_type": content_type,
+                "response_bytes": len(body),
+                "json_shape": json_shape,
+                "error": parse_error,
+            }
+    except urllib.error.HTTPError as exc:
+        return {
+            "name": name or "endpoint",
+            "url": endpoint,
+            "available": False,
+            "status_code": exc.code,
+            "latency_ms": (time.monotonic() - started) * 1000.0,
+            "observed_at": datetime.now(timezone.utc).isoformat(),
+            "content_type": None,
+            "response_bytes": 0,
+            "json_shape": None,
+            "error": f"http {exc.code}",
+        }
+    except Exception as exc:
+        return {
+            "name": name or "endpoint",
+            "url": endpoint,
+            "available": False,
+            "status_code": None,
+            "latency_ms": (time.monotonic() - started) * 1000.0,
+            "observed_at": datetime.now(timezone.utc).isoformat(),
+            "content_type": None,
+            "response_bytes": 0,
+            "json_shape": None,
+            "error": str(exc),
+        }
+
+
+def _api_probe_summary(probes: list[dict]) -> dict:
+    total = len(probes)
+    healthy = sum(1 for probe in probes if probe.get("available"))
+    latencies = [float(probe["latency_ms"]) for probe in probes if probe.get("latency_ms") is not None]
+    avg_latency_ms = sum(latencies) / len(latencies) if latencies else None
+    return {
+        "healthy": healthy,
+        "total": total,
+        "coverage_percent": ((healthy / total) * 100.0) if total > 0 else 0.0,
+        "avg_latency_ms": avg_latency_ms,
+    }
+
+
+def _build_sidecar_payload(base: dict, probes: list[dict]) -> dict:
+    payload = dict(base)
+    payload.setdefault("observed_at", datetime.now(timezone.utc).isoformat())
+    payload["api_probes"] = probes
+    payload["api_probe_summary"] = _api_probe_summary(probes)
+    payload["api_capability_count"] = len(probes)
+    return payload
+
+
 def _parse_host_port(address: str) -> tuple[str | None, int | None]:
     value = (address or "").strip()
     if not value:
@@ -819,7 +949,7 @@ def _node_exporter_runtime() -> dict:
             active_devices.add(device)
         net_tx += value
 
-    return {
+    payload = {
         "available": True,
         "load1": _safe_metric(parsed, "node_load1"),
         "load5": _safe_metric(parsed, "node_load5"),
@@ -833,6 +963,10 @@ def _node_exporter_runtime() -> dict:
         "network_tx_bytes_total": net_tx,
         "active_devices": sorted(active_devices),
     }
+    probes = [
+        _probe_endpoint_detail(settings.NODE_EXPORTER_ENDPOINT_URL, name="metrics"),
+    ]
+    return _build_sidecar_payload(payload, probes)
 
 
 def _podman_exporter_runtime() -> dict:
@@ -853,7 +987,7 @@ def _podman_exporter_runtime() -> dict:
         else:
             other_states += 1
 
-    return {
+    payload = {
         "available": True,
         "containers_running": running,
         "containers_exited": exited,
@@ -861,6 +995,10 @@ def _podman_exporter_runtime() -> dict:
         "container_mem_usage_bytes": _safe_metric_sum(parsed, "podman_container_mem_usage_bytes"),
         "container_cpu_system_seconds_total": _safe_metric_sum(parsed, "podman_container_cpu_system_seconds_total"),
     }
+    probes = [
+        _probe_endpoint_detail(settings.PODMAN_EXPORTER_ENDPOINT_URL, name="metrics"),
+    ]
+    return _build_sidecar_payload(payload, probes)
 
 
 def _postgres_exporter_runtime() -> dict:
@@ -875,7 +1013,7 @@ def _postgres_exporter_runtime() -> dict:
     if blks_hit is not None and blks_read is not None and (blks_hit + blks_read) > 0:
         cache_hit_percent = (blks_hit / (blks_hit + blks_read)) * 100.0
 
-    return {
+    payload = {
         "available": True,
         "up": _safe_metric(parsed, "pg_up"),
         "database_size_bytes": _safe_metric(parsed, "pg_database_size_bytes", labels={"datname": settings.POSTGRES_DB}),
@@ -884,6 +1022,10 @@ def _postgres_exporter_runtime() -> dict:
         "xact_rollback_total": _safe_metric(parsed, "pg_stat_database_xact_rollback", labels={"datname": settings.POSTGRES_DB}),
         "cache_hit_percent": cache_hit_percent,
     }
+    probes = [
+        _probe_endpoint_detail(settings.POSTGRES_EXPORTER_ENDPOINT_URL, name="metrics"),
+    ]
+    return _build_sidecar_payload(payload, probes)
 
 
 def _falcosidekick_runtime() -> dict:
@@ -902,7 +1044,7 @@ def _falcosidekick_runtime() -> dict:
     if input_total > 0:
         rejection_percent = (rejected / input_total) * 100.0
 
-    return {
+    payload = {
         "available": True,
         "inputs_total": input_total,
         "inputs_rejected": rejected,
@@ -910,6 +1052,10 @@ def _falcosidekick_runtime() -> dict:
         "goroutines": _safe_metric(parsed, "go_goroutines"),
         "resident_memory_bytes": _safe_metric(parsed, "process_resident_memory_bytes"),
     }
+    probes = [
+        _probe_endpoint_detail(settings.FALCOSIDEKICK_ENDPOINT_URL, name="metrics"),
+    ]
+    return _build_sidecar_payload(payload, probes)
 
 
 def _parca_runtime() -> dict:
@@ -930,7 +1076,7 @@ def _parca_runtime() -> dict:
         "grpc_code": "OK",
     })
 
-    return {
+    payload = {
         "available": True,
         "go_goroutines": _safe_metric(parsed, "go_goroutines"),
         "resident_memory_bytes": _safe_metric(parsed, "process_resident_memory_bytes"),
@@ -938,6 +1084,12 @@ def _parca_runtime() -> dict:
         "debuginfod_cache_hit_percent": cache_hit_percent,
         "grpc_write_raw_ok_total": grpc_write_ok,
     }
+    base = settings.PARCA_SERVER_ENDPOINT_URL.rstrip("/")
+    probes = [
+        _probe_endpoint_detail(f"{base}/metrics", name="metrics"),
+        _probe_endpoint_detail(f"{base}/-/healthy", name="health"),
+    ]
+    return _build_sidecar_payload(payload, probes)
 
 
 def _extract_go_build_version(metrics: dict[str, list[dict]]) -> str | None:
@@ -954,31 +1106,43 @@ def _ebpf_agent_runtime() -> dict:
         return {"available": False}
 
     parsed, _ = _parse_metrics(text)
-    return {
+    payload = {
         "available": True,
         "version": _extract_go_build_version(parsed),
         "go_goroutines": _safe_metric(parsed, "go_goroutines"),
         "resident_memory_bytes": _safe_metric(parsed, "process_resident_memory_bytes"),
         "debuginfo_upload_request_bytes": _safe_metric(parsed, "debuginfo_upload_request_bytes"),
     }
+    probes = [
+        _probe_endpoint_detail(settings.EBPF_EXPORTER_ENDPOINT_URL, name="metrics"),
+    ]
+    return _build_sidecar_payload(payload, probes)
 
 
 def _crowdsec_runtime() -> dict:
     payload = _fetch_endpoint_json(settings.CROWDSEC_ENDPOINT_URL)
     if not payload:
-        return {"available": False}
+        probe = _probe_endpoint_detail(settings.CROWDSEC_ENDPOINT_URL, expect_json=True, name="health")
+        return _build_sidecar_payload({"available": False}, [probe])
     status = str(payload.get("status") or "unknown").lower()
-    return {
+    sidecar_payload = {
         "available": True,
         "status": status,
         "healthy": status == "up",
     }
+    probes = [
+        _probe_endpoint_detail(settings.CROWDSEC_ENDPOINT_URL, expect_json=True, name="health"),
+    ]
+    return _build_sidecar_payload(sidecar_payload, probes)
 
 
 def _trivy_runtime() -> dict:
     payload = _fetch_endpoint_json(settings.TRIVY_SERVER_ENDPOINT_URL)
     if not payload:
-        return {"available": False}
+        probes = [
+            _probe_endpoint_detail(settings.TRIVY_SERVER_ENDPOINT_URL, expect_json=True, name="version"),
+        ]
+        return _build_sidecar_payload({"available": False}, probes)
 
     db = payload.get("VulnerabilityDB") or {}
     updated_at = db.get("UpdatedAt")
@@ -991,7 +1155,7 @@ def _trivy_runtime() -> dict:
     except Exception:
         updated_age_hours = None
 
-    return {
+    sidecar_payload = {
         "available": True,
         "version": payload.get("Version"),
         "db_version": db.get("Version"),
@@ -999,18 +1163,85 @@ def _trivy_runtime() -> dict:
         "db_next_update": next_update,
         "db_age_hours": updated_age_hours,
     }
+    parsed = urlparse(settings.TRIVY_SERVER_ENDPOINT_URL)
+    base = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else settings.TRIVY_SERVER_ENDPOINT_URL.rstrip("/")
+    probes = [
+        _probe_endpoint_detail(settings.TRIVY_SERVER_ENDPOINT_URL, expect_json=True, name="version"),
+        _probe_endpoint_detail(f"{base}/health", expect_json=False, name="health"),
+    ]
+    return _build_sidecar_payload(sidecar_payload, probes)
+
+
+def _optional_api_sidecar_runtime(endpoint_url: str, probe_name: str = "api") -> dict:
+    endpoint = (endpoint_url or "").strip()
+    if not endpoint:
+        return {
+            "configured": False,
+            "available": False,
+            "api_capability_count": 0,
+            "api_probes": [],
+            "api_probe_summary": {
+                "healthy": 0,
+                "total": 0,
+                "coverage_percent": 0.0,
+                "avg_latency_ms": None,
+            },
+        }
+
+    probe = _probe_endpoint_detail(endpoint, expect_json=True, name=probe_name)
+    return _build_sidecar_payload(
+        {
+            "configured": True,
+            "available": probe.get("available", False),
+        },
+        [probe],
+    )
+
+
+def _cached_sidecar_probe(sidecar_id: str, probe_fn) -> dict:
+    now = time.monotonic()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    ttl = float(_SIDECAR_TTL_SECONDS.get(sidecar_id, 30.0))
+    entry = _SIDECAR_CACHE.get(sidecar_id)
+    if entry and entry.get("expires_at", 0.0) > now:
+        payload = dict(entry["payload"])
+        payload["cache_age_seconds"] = max(0.0, now - float(entry.get("fetched_at", now)))
+        payload["cache_ttl_seconds"] = ttl
+        payload["cache_state"] = "hit"
+        payload["cache_served_at"] = now_iso
+        return payload
+
+    payload = probe_fn()
+    # Failed probes get a shorter retry interval so recovery is detected quickly.
+    effective_ttl = ttl if payload.get("available") else min(20.0, ttl)
+    _SIDECAR_CACHE[sidecar_id] = {
+        "payload": payload,
+        "fetched_at": now,
+        "fetched_at_iso": now_iso,
+        "expires_at": now + effective_ttl,
+    }
+
+    fresh_payload = dict(payload)
+    fresh_payload["cache_age_seconds"] = 0.0
+    fresh_payload["cache_ttl_seconds"] = effective_ttl
+    fresh_payload["cache_state"] = "miss"
+    fresh_payload["cache_served_at"] = now_iso
+    return fresh_payload
 
 
 def _sidecar_runtime() -> dict:
     return {
-        "node_exporter": _node_exporter_runtime(),
-        "podman_exporter": _podman_exporter_runtime(),
-        "postgres_exporter": _postgres_exporter_runtime(),
-        "falcosidekick": _falcosidekick_runtime(),
-        "parca": _parca_runtime(),
-        "ebpf_agent": _ebpf_agent_runtime(),
-        "crowdsec": _crowdsec_runtime(),
-        "trivy_server": _trivy_runtime(),
+        "node_exporter": _cached_sidecar_probe("node_exporter", _node_exporter_runtime),
+        "podman_exporter": _cached_sidecar_probe("podman_exporter", _podman_exporter_runtime),
+        "postgres_exporter": _cached_sidecar_probe("postgres_exporter", _postgres_exporter_runtime),
+        "falcosidekick": _cached_sidecar_probe("falcosidekick", _falcosidekick_runtime),
+        "parca": _cached_sidecar_probe("parca", _parca_runtime),
+        "ebpf_agent": _cached_sidecar_probe("ebpf_agent", _ebpf_agent_runtime),
+        "crowdsec": _cached_sidecar_probe("crowdsec", _crowdsec_runtime),
+        "trivy_server": _cached_sidecar_probe("trivy_server", _trivy_runtime),
+        "wazuh_api": _optional_api_sidecar_runtime(settings.WAZUH_API_ENDPOINT_URL),
+        "fleet_api": _optional_api_sidecar_runtime(settings.FLEET_API_ENDPOINT_URL),
+        "osquery_exporter": _optional_api_sidecar_runtime(settings.OSQUERY_EXPORTER_ENDPOINT_URL),
     }
 
 

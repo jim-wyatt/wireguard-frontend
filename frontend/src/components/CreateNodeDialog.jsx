@@ -10,7 +10,7 @@ import {
 } from '@mui/material'
 import { clientsApi } from '../services/api'
 
-function CreateClientDialog({ open, onClose, onSuccess }) {
+function CreateNodeDialog({ open, onClose, onSuccess }) {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
@@ -34,7 +34,7 @@ function CreateClientDialog({ open, onClose, onSuccess }) {
       onSuccess()
       onClose()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create client')
+      setError(err.response?.data?.detail || 'Failed to create node')
     } finally {
       setLoading(false)
     }
@@ -43,7 +43,7 @@ function CreateClientDialog({ open, onClose, onSuccess }) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <form onSubmit={handleSubmit}>
-        <DialogTitle>Create New Client</DialogTitle>
+        <DialogTitle>Create New Node</DialogTitle>
         <DialogContent>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -75,7 +75,7 @@ function CreateClientDialog({ open, onClose, onSuccess }) {
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>
           <Button type="submit" variant="contained" disabled={loading}>
-            {loading ? 'Creating...' : 'Create'}
+            {loading ? 'Creating...' : 'Create Node'}
           </Button>
         </DialogActions>
       </form>
@@ -83,4 +83,4 @@ function CreateClientDialog({ open, onClose, onSuccess }) {
   )
 }
 
-export default CreateClientDialog
+export default CreateNodeDialog

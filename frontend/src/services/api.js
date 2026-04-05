@@ -129,6 +129,15 @@ export const clientsApi = {
       Pragma: 'no-cache',
     },
   }),
+
+  // Non-interactive btop snapshot for debug table view.
+  getBtopSnapshot: () => api.get('/debug/btop/snapshot', {
+    params: { _ts: Date.now() },
+    headers: {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+  }),
 };
 
 export default api;

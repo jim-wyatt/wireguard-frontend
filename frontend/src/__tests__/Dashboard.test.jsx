@@ -1,11 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import Dashboard from '../pages/Dashboard'
 import { clientsApi } from '../services/api'
 
 vi.mock('../services/api', () => ({
   clientsApi: {
     getStats: vi.fn(),
-    getConnectedClients: vi.fn(),
+    getMetricsSummary: vi.fn(),
+    getAttestationSummary: vi.fn(),
     streamCaddyAccessLog: vi.fn().mockResolvedValue(undefined),
   },
 }))
@@ -15,7 +17,7 @@ describe('Dashboard', () => {
     vi.clearAllMocks()
   })
 
-  it('renders stats and connected clients', async () => {
+  it('renders cross-tab summary cards', async () => {
     clientsApi.getStats.mockResolvedValue({
       data: {
         total_clients: 8,
@@ -24,37 +26,50 @@ describe('Dashboard', () => {
       },
     })
 
-    clientsApi.getConnectedClients.mockResolvedValue({
-      data: [
-        {
-          id: 1,
-          email: 'alice@example.com',
-          name: 'Alice',
-          ip_address: '10.0.0.2',
-          last_handshake: '2026-04-04T10:00:00Z',
-          transfer_rx: 2048,
-          transfer_tx: 4096,
+    clientsApi.getMetricsSummary.mockResolvedValue({
+      data: {
+        runtime: {
+          backend: { error_rate_percent: 0.5, p95_latency_ms: 120 },
+          wireguard: { is_up: true },
         },
-      ],
+        source_probes: [
+          { id: 'p1', available: true },
+          { id: 'p2', available: true },
+        ],
+      },
     })
 
-    render(<Dashboard />)
+    clientsApi.getAttestationSummary.mockResolvedValue({
+      data: {
+        security: {
+          remediation: {
+            actionable: { critical: 0, high: 1 },
+          },
+        },
+      },
+    })
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    )
 
     await waitFor(() => {
       expect(clientsApi.getStats).toHaveBeenCalledTimes(1)
-      expect(clientsApi.getConnectedClients).toHaveBeenCalledTimes(1)
+      expect(clientsApi.getMetricsSummary).toHaveBeenCalledTimes(1)
+      expect(clientsApi.getAttestationSummary).toHaveBeenCalledTimes(1)
     })
 
-    expect(await screen.findByText('Dashboard')).toBeInTheDocument()
-    expect(screen.getByText('8')).toBeInTheDocument()
-    expect(screen.getByText('5')).toBeInTheDocument()
-    expect(screen.getByText('2')).toBeInTheDocument()
-    expect(screen.getByText('alice@example.com')).toBeInTheDocument()
-    expect(screen.getByText('2 KB')).toBeInTheDocument()
-    expect(screen.getByText('4 KB')).toBeInTheDocument()
+    expect(await screen.findByText(/Cross-Tab Command Deck/)).toBeInTheDocument()
+    expect(screen.getByText(/NODES TAB/)).toBeInTheDocument()
+    expect(screen.getByText(/LOGS TAB/)).toBeInTheDocument()
+    expect(screen.getByText(/ATTESTATION TAB/)).toBeInTheDocument()
+    expect(screen.getByText(/METRICS TAB/)).toBeInTheDocument()
+    expect(screen.getByText(/OPERATIONS TAB/)).toBeInTheDocument()
   })
 
-  it('shows empty-state message when no clients are connected', async () => {
+  it('still renders cards when values are zero', async () => {
     clientsApi.getStats.mockResolvedValue({
       data: {
         total_clients: 0,
@@ -62,10 +77,31 @@ describe('Dashboard', () => {
         connected_clients: 0,
       },
     })
-    clientsApi.getConnectedClients.mockResolvedValue({ data: [] })
+    clientsApi.getMetricsSummary.mockResolvedValue({
+      data: {
+        runtime: {
+          backend: { error_rate_percent: 0, p95_latency_ms: 0 },
+          wireguard: { is_up: false },
+        },
+        source_probes: [],
+      },
+    })
+    clientsApi.getAttestationSummary.mockResolvedValue({
+      data: {
+        security: {
+          remediation: {
+            actionable: { critical: 0, high: 0 },
+          },
+        },
+      },
+    })
 
-    render(<Dashboard />)
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    )
 
-    expect(await screen.findByText('No clients currently connected')).toBeInTheDocument()
+    expect(await screen.findByText(/NODES TAB/)).toBeInTheDocument()
   })
 })

@@ -12,6 +12,7 @@ from app.api import clients
 from app.api import logs
 from app.api import attestation
 from app.api import metrics
+from app.api import debug
 from app.db.database import engine, Base, SessionLocal
 from app.services.client_sync import sync_clients_with_wireguard
 
@@ -62,6 +63,7 @@ def create_app() -> FastAPI:
     app.include_router(logs.router, prefix="/api", tags=["logs"])
     app.include_router(attestation.router, prefix="/api", tags=["attestation"])
     app.include_router(metrics.router, prefix="/api", tags=["metrics"])
+    app.include_router(debug.router, prefix="/api", tags=["debug"])
 
     @app.middleware("http")
     async def capture_internal_metrics(request, call_next):

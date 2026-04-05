@@ -4,11 +4,12 @@ import { Box, CircularProgress } from '@mui/material'
 import Layout from './components/Layout'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
-const Clients = lazy(() => import('./pages/Clients'))
+const Nodes = lazy(() => import('./pages/Nodes'))
 const Logs = lazy(() => import('./pages/Logs'))
 const Attestation = lazy(() => import('./pages/Attestation'))
 const Metrics = lazy(() => import('./pages/Metrics'))
 const Operations = lazy(() => import('./pages/Operations'))
+const Debug = lazy(() => import('./pages/Debug'))
 const Login = lazy(() => import('./pages/Login'))
 const PublicDashboard = lazy(() => import('./pages/PublicDashboard'))
 
@@ -43,11 +44,12 @@ function App() {
             <Dashboard />
           </Suspense>
         } />
-        <Route path="/clients" element={
+        <Route path="/nodes" element={
           <Suspense fallback={<PageLoader />}>
-            <Clients />
+            <Nodes />
           </Suspense>
         } />
+        <Route path="/clients" element={<Navigate to="/nodes" replace />} />
         <Route path="/logs" element={
           <Suspense fallback={<PageLoader />}>
             <Logs />
@@ -66,6 +68,11 @@ function App() {
         <Route path="/operations" element={
           <Suspense fallback={<PageLoader />}>
             <Operations />
+          </Suspense>
+        } />
+        <Route path="/debug" element={
+          <Suspense fallback={<PageLoader />}>
+            <Debug />
           </Suspense>
         } />
       </Route>

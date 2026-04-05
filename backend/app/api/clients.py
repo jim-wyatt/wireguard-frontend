@@ -6,7 +6,7 @@ import logging
 
 from app.db.database import get_db
 from app.db.models import Client
-from app.core.auth import Role, optional_api_auth, require_writer_role
+from app.core.auth import Role, require_api_auth, require_writer_role
 from app.core.config import settings
 from app.core.rate_limit import per_ip_limit
 from app.schemas.client import (
@@ -181,7 +181,7 @@ async def list_clients(
     limit: int = 100,
     active_only: bool = False,
     db: Session = Depends(get_db),
-    _: None = Depends(optional_api_auth),
+    _: None = Depends(require_api_auth),
     __: None = Depends(dashboard_rate_limit),
 ):
     """List all clients"""
@@ -196,9 +196,6 @@ async def list_clients(
         query = query.filter(Client.is_active == True)
     
     clients = query.offset(skip).limit(limit).all()
-
-    if not _is_authenticated(request):
-        return [_public_client_view(client) for client in clients]
 
     return clients
 
@@ -242,7 +239,7 @@ async def get_connected_clients(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
-    __: None = Depends(optional_api_auth),
+    __: None = Depends(require_api_auth),
     _: None = Depends(dashboard_rate_limit),
 ):
     """Get list of currently connected clients"""
@@ -274,20 +271,17 @@ async def get_connected_clients(
             db_updated = True
 
         if live_handshake and live_handshake > timeout_threshold:
-            if _is_authenticated(request):
-                connected_clients.append(
-                    ClientConnected(
-                        id=client.id,
-                        email=client.email,
-                        name=client.name,
-                        ip_address=client.ip_address,
-                        last_handshake=live_handshake,
-                        transfer_rx=peer_info["transfer_rx"],
-                        transfer_tx=peer_info["transfer_tx"]
-                    )
+            connected_clients.append(
+                ClientConnected(
+                    id=client.id,
+                    email=client.email,
+                    name=client.name,
+                    ip_address=client.ip_address,
+                    last_handshake=live_handshake,
+                    transfer_rx=peer_info["transfer_rx"],
+                    transfer_tx=peer_info["transfer_tx"]
                 )
-            else:
-                connected_clients.append(_public_connected_view(client, peer_info))
+            )
 
     if db_updated:
         db.commit()
@@ -299,7 +293,7 @@ async def get_client(
     request: Request,
     client_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(optional_api_auth),
+    _: None = Depends(require_api_auth),
     __: None = Depends(dashboard_rate_limit),
 ):
     """Get client details"""
@@ -309,8 +303,6 @@ async def get_client(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Client not found"
         )
-    if not _is_authenticated(request):
-        return _public_client_view(client)
     return client
 
 @router.get("/clients/{client_id}/config", response_model=ClientConfig)

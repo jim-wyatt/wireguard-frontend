@@ -1,23 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link as RouterLink } from 'react-router-dom'
-import {
-  Box,
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  Container,
-  Button,
-  Paper,
-  Stack,
-} from '@mui/material'
-import PeopleIcon from '@mui/icons-material/People'
-import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import SignalCellularAltIcon from '@mui/icons-material/SignalCellularAlt'
+import { Box } from '@mui/material'
 import { clientsApi } from '../services/api'
+import { DenseCards, DenseGrid, DenseMetricCard, DenseSection } from '../components/dense/CyberUi'
 
 function PublicDashboard() {
   const [stats, setStats] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const formatLastUpdated = (value) => {
     if (!value) return 'Unknown'
@@ -28,11 +17,14 @@ function PublicDashboard() {
 
   useEffect(() => {
     const loadStats = async () => {
+      setError('')
       try {
         const response = await clientsApi.getStats()
         setStats(response.data)
       } catch (err) {
-        console.error('Failed to load public stats:', err)
+        setError(err?.response?.data?.detail || err?.message || 'Failed to load public stats')
+      } finally {
+        setLoading(false)
       }
     }
 
@@ -41,94 +33,172 @@ function PublicDashboard() {
     return () => clearInterval(interval)
   }, [])
 
+  const cards = [
+    {
+      key: 'engagement',
+      title: 'ENGAGEMENT RATE',
+      value: `${((Number(stats?.connected_clients || 0) / Math.max(Number(stats?.active_clients || 1), 1)) * 100).toFixed(0)}%`,
+      hint: `${stats?.connected_clients || 0} connected of ${stats?.active_clients || 0} active nodes`,
+      status: Number(stats?.active_clients || 0) === 0 ? 'amber' : (Number(stats?.connected_clients || 0) / Math.max(Number(stats?.active_clients || 1), 1)) >= 0.7 ? 'green' : 'amber',
+      importance: 'Shows current participation across enabled identities.',
+    },
+    {
+      key: 'total',
+      title: 'TOTAL NODES',
+      value: String(stats?.total_clients || 0),
+      hint: 'registered peer identities',
+      status: 'green',
+      importance: 'Represents total managed population across environments.',
+    },
+    {
+      key: 'active',
+      title: 'ACTIVE NODES',
+      value: String(stats?.active_clients || 0),
+      hint: 'eligible to connect now',
+      status: Number(stats?.active_clients || 0) > 0 ? 'green' : 'amber',
+      importance: 'Measures currently enabled access footprint.',
+    },
+    {
+      key: 'connected',
+      title: 'CONNECTED NOW',
+      value: String(stats?.connected_clients || 0),
+      hint: `updated ${formatLastUpdated(stats?.last_updated)}`,
+      status: Number(stats?.connected_clients || 0) > 0 ? 'green' : 'amber',
+      importance: 'Near-real-time service adoption and live availability signal.',
+    },
+    {
+      key: 'capacity-gap',
+      title: 'CAPACITY GAP',
+      value: String(Math.max(Number(stats?.active_clients || 0) - Number(stats?.connected_clients || 0), 0)),
+      hint: 'active not currently connected',
+      status: Math.max(Number(stats?.active_clients || 0) - Number(stats?.connected_clients || 0), 0) <= 2 ? 'green' : 'amber',
+      importance: 'Quantifies currently idle capacity in the active roster.',
+    },
+    {
+      key: 'activation-rate',
+      title: 'ACTIVATION RATE',
+      value: `${((Number(stats?.active_clients || 0) / Math.max(Number(stats?.total_clients || 1), 1)) * 100).toFixed(0)}%`,
+      hint: `${stats?.active_clients || 0} active of ${stats?.total_clients || 0} total`,
+      status: Number(stats?.total_clients || 0) === 0 ? 'amber' : (Number(stats?.active_clients || 0) / Math.max(Number(stats?.total_clients || 1), 1)) >= 0.75 ? 'green' : 'amber',
+      importance: 'Indicates how much of the registered population is enabled.',
+    },
+    {
+      key: 'public-refresh',
+      title: 'REFRESH CADENCE',
+      value: '3s',
+      hint: `last update ${formatLastUpdated(stats?.last_updated)}`,
+      status: 'green',
+      importance: 'Fast cadence supports public situational awareness.',
+    },
+  ]
+
+  if (loading) {
+    cards.unshift({
+      key: 'load-state',
+      title: 'PAGE STATE',
+      value: 'LOADING',
+      hint: 'refreshing public snapshot',
+      status: 'amber',
+      importance: 'Public board is collecting latest aggregate metrics.',
+    })
+  }
+
+  if (error) {
+    cards.unshift({
+      key: 'error-state',
+      title: 'PUBLIC FEED',
+      value: 'DEGRADED',
+      hint: error,
+      status: 'red',
+      importance: 'Stats endpoint did not return the expected payload.',
+    })
+  }
+
+  const routeCards = [
+    {
+      key: 'route-login',
+      title: 'ROUTE LOGIN',
+      value: '/login',
+      hint: 'operator authentication entry point',
+      status: 'amber',
+      importance: 'Required for privileged management and download operations.',
+    },
+    {
+      key: 'route-dashboard',
+      title: 'ROUTE DASHBOARD',
+      value: '/dashboard',
+      hint: 'cross-tab command deck',
+      status: 'green',
+      importance: 'Central operator launch surface for all tabs.',
+    },
+    {
+      key: 'route-logs',
+      title: 'ROUTE LOGS',
+      value: '/logs',
+      hint: 'event stream and table view',
+      status: 'green',
+      importance: 'Primary table-oriented diagnostics and incident triage.',
+    },
+    {
+      key: 'route-attestation',
+      title: 'ROUTE ATTESTATION',
+      value: '/attestation',
+      hint: 'trust posture card deck',
+      status: 'green',
+      importance: 'Evidence and remediation confidence monitoring.',
+    },
+    {
+      key: 'route-metrics',
+      title: 'ROUTE METRICS',
+      value: '/metrics',
+      hint: 'runtime telemetry card deck',
+      status: 'green',
+      importance: 'High-frequency health and trend signal review.',
+    },
+    {
+      key: 'route-operations',
+      title: 'ROUTE OPERATIONS',
+      value: '/operations',
+      hint: 'composite readiness card deck',
+      status: 'green',
+      importance: 'Unified operational and attestation risk panel.',
+    },
+  ]
+
   return (
-    <Container maxWidth="lg" sx={{ py: 6 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-        <Box
-          component="img"
-          src="/favicon.svg"
-          alt="Security shield"
-          sx={{ width: 40, height: 40 }}
-        />
-        <Typography variant="h3" gutterBottom sx={{ mb: 0 }}>
-          WireGuard Status
-        </Typography>
-      </Box>
-      <Typography color="text.secondary" sx={{ mb: 4 }}>
-        Public aggregate metrics for the VPN service.
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Last updated: {formatLastUpdated(stats?.last_updated)}
-      </Typography>
+    <Box sx={{ px: 1.5, pt: 1.5, pb: 3 }}>
+      <DenseGrid>
+        <DenseSection title="Public Vitals" subtitle={`last update ${formatLastUpdated(stats?.last_updated)}`} colSpan={3} rowSpan={2}>
+          <DenseCards>
+            {cards.map((card) => (
+              <DenseMetricCard
+                key={card.key}
+                title={card.title}
+                value={card.value}
+                hint={card.hint}
+                status={card.status}
+                importance={card.importance}
+              />
+            ))}
+          </DenseCards>
+        </DenseSection>
 
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={4}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <PeopleIcon sx={{ fontSize: 40, mr: 2, color: 'primary.main' }} />
-                <Box>
-                  <Typography variant="h4">{stats?.total_clients || 0}</Typography>
-                  <Typography color="text.secondary">Total Clients</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={4}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <CheckCircleIcon sx={{ fontSize: 40, mr: 2, color: 'success.main' }} />
-                <Box>
-                  <Typography variant="h4">{stats?.active_clients || 0}</Typography>
-                  <Typography color="text.secondary">Active Clients</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={4}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <SignalCellularAltIcon sx={{ fontSize: 40, mr: 2, color: 'info.main' }} />
-                <Box>
-                  <Typography variant="h4">{stats?.connected_clients || 0}</Typography>
-                  <Typography color="text.secondary">Connected Now</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      <Paper sx={{ p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-        <Box>
-          <Typography variant="h6">Administrator Access</Typography>
-          <Typography color="text.secondary">Login to manage clients and view detailed connection data.</Typography>
-        </Box>
-        <Button variant="contained" component={RouterLink} to="/login">
-          Login
-        </Button>
-      </Paper>
-
-      <Paper sx={{ p: 3, mt: 3 }}>
-        <Typography variant="h6" sx={{ mb: 1 }}>Browse Public Pages</Typography>
-        <Typography color="text.secondary" sx={{ mb: 2 }}>
-          These pages are readable without authentication.
-        </Typography>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} useFlexGap flexWrap="wrap">
-          <Button variant="outlined" component={RouterLink} to="/dashboard">Dashboard</Button>
-          <Button variant="outlined" component={RouterLink} to="/clients">Clients</Button>
-          <Button variant="outlined" component={RouterLink} to="/logs">Logs</Button>
-          <Button variant="outlined" component={RouterLink} to="/attestation">Attestation</Button>
-          <Button variant="outlined" component={RouterLink} to="/metrics">Metrics</Button>
-        </Stack>
-      </Paper>
-    </Container>
+        <DenseSection title="Navigation Cards" subtitle="card-based route jumps" colSpan={3} rowSpan={1}>
+          <DenseCards>
+            {routeCards.map((card) => (
+              <DenseMetricCard
+                key={card.key}
+                title={card.title}
+                value={card.value}
+                hint={card.hint}
+                status={card.status}
+                importance={card.importance}
+              />
+            ))}
+          </DenseCards>
+        </DenseSection>
+      </DenseGrid>
+    </Box>
   )
 }
 
