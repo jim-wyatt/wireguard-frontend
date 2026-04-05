@@ -1,31 +1,33 @@
-import { Children } from 'react'
+import { Children, ReactNode } from 'react'
 import { Box, Paper, Stack, Typography, useMediaQuery, useTheme } from '@mui/material'
 
+export type RagStatus = 'red' | 'amber' | 'green'
+
 // Status-driven visual tokens — colored border + subtle tint + glowing dot
-const RAG_TOKENS = {
+const RAG_TOKENS: Record<RagStatus, { border: string; bg: string; dot: string }> = {
   red:   { border: 'rgba(229,57,53,0.85)',  bg: 'rgba(229,57,53,0.07)',   dot: '#ef5350' },
   amber: { border: 'rgba(255,152,0,0.85)',  bg: 'rgba(255,152,0,0.055)',  dot: '#ff9800' },
   green: { border: 'rgba(0,200,83,0.6)',    bg: 'rgba(0,200,83,0.035)',   dot: '#00c853' },
 }
 
-function normalizeSpan(span) {
+function normalizeSpan(span: number | string): number {
   const n = Number(span) || 1
   return Math.max(1, Math.min(3, n))
 }
 
-export function ragColor(status) {
+export function ragColor(status: RagStatus): 'error' | 'warning' | 'success' {
   if (status === 'red') return 'error'
   if (status === 'amber') return 'warning'
   return 'success'
 }
 
-export function ragLabel(status) {
+export function ragLabel(status: RagStatus): string {
   if (status === 'red') return 'RED'
   if (status === 'amber') return 'AMBER'
   return 'GREEN'
 }
 
-function compactSparkline(values) {
+function compactSparkline(values?: number[]): string {
   const blocks = ['_', '.', ':', '-', '=', '+', '*', '#']
   const numbers = (values || []).filter((v) => Number.isFinite(v)).slice(-18)
   if (numbers.length < 2) return '........'
@@ -40,9 +42,7 @@ function compactSparkline(values) {
     .join('')
 }
 
-
-
-export function DenseGrid({ children }) {
+export function DenseGrid({ children }: { children: ReactNode }) {
   return (
     <Box
       sx={{
@@ -66,7 +66,15 @@ export function DenseGrid({ children }) {
   )
 }
 
-export function DenseSection({ title, subtitle, colSpan = 1, rowSpan = 1, children }) {
+interface DenseSectionProps {
+  title: string
+  subtitle?: string
+  colSpan?: number
+  rowSpan?: number
+  children: ReactNode
+}
+
+export function DenseSection({ title, subtitle, colSpan = 1, rowSpan = 1, children }: DenseSectionProps) {
   const normalizedColSpan = normalizeSpan(colSpan)
   const normalizedRowSpan = normalizeSpan(rowSpan)
 
@@ -115,7 +123,7 @@ export function DenseSection({ title, subtitle, colSpan = 1, rowSpan = 1, childr
   )
 }
 
-export function DenseCards({ children, cols }) {
+export function DenseCards({ children, cols }: { children: ReactNode; cols?: number }) {
   const theme = useTheme()
   const isXl = useMediaQuery(theme.breakpoints.up('xl'))
   const isLg = useMediaQuery(theme.breakpoints.up('lg'))
@@ -144,7 +152,6 @@ export function DenseCards({ children, cols }) {
       {cardItems}
       {Array.from({ length: fillerCount }).map((_, index) => (
         <Paper
-          // Hidden fillers preserve strict grid symmetry on the final row.
           key={`dense-filler-${index}`}
           aria-hidden
           sx={{
@@ -161,8 +168,18 @@ export function DenseCards({ children, cols }) {
   )
 }
 
-export function DenseMetricCard({ title, value, hint, status = 'green', importance, trendValues, progressPercent }) {
-  const tok = RAG_TOKENS[status] || RAG_TOKENS.green
+export interface DenseMetricCardProps {
+  title: string
+  value: string
+  hint?: string
+  status?: RagStatus
+  importance?: string
+  trendValues?: number[]
+  progressPercent?: number | null
+}
+
+export function DenseMetricCard({ title, value, hint, status = 'green', importance, trendValues, progressPercent }: DenseMetricCardProps) {
+  const tok = RAG_TOKENS[status] ?? RAG_TOKENS.green
   const sparkline = compactSparkline(trendValues)
   return (
     <Paper
@@ -223,7 +240,7 @@ export function DenseMetricCard({ title, value, hint, status = 'green', importan
           {sparkline}
         </Typography>
       ) : null}
-      {progressPercent !== undefined ? (
+      {progressPercent !== undefined && progressPercent !== null ? (
         <Box sx={{ mt: 0.4, height: 3, borderRadius: 1, bgcolor: 'action.disabledBackground', overflow: 'hidden' }}>
           <Box
             sx={{

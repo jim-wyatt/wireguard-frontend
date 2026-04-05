@@ -7,14 +7,14 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: './src/test/setup.js',
+    setupFiles: './src/test/setup.ts',
     exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json-summary'],
       reportsDirectory: './coverage',
-      include: ['src/**/*.{js,jsx}'],
-      exclude: ['src/test/**', 'src/__tests__/**', 'src/main.jsx', 'dist/**'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/test/**', 'src/__tests__/**', 'src/main.tsx', 'dist/**'],
       thresholds: {
         lines: 40,
         statements: 40,

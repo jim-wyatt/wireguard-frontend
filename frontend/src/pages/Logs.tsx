@@ -1,27 +1,55 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Box, Button, Chip, LinearProgress, Stack, TextField, Typography } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
+import { DataGrid, GridColDef } from '@mui/x-data-grid'
 import { clientsApi } from '../services/api'
 import { DenseCards, DenseGrid, DenseMetricCard, DenseSection } from '../components/dense/CyberUi'
+import type { RagStatus } from '../components/dense/CyberUi'
+
+type ApiData = Record<string, unknown>
 
 const FILE_SOURCES = ['caddy', 'app', 'system']
 
-function normalizePath(uri) {
+type LogLevel = 'error' | 'warn' | 'ok' | 'info'
+
+interface LogEntry {
+  id: string
+  ts: string
+  at: number
+  level: LogLevel
+  source: string
+  eventType: string
+  target: string
+  actor: string
+  code: number | null
+  latencyMs: number | null
+  summary: string
+  detail: string
+}
+
+interface CardItem {
+  key: string
+  title: string
+  value: string
+  hint: string
+  status: RagStatus
+  importance?: string
+}
+
+function normalizePath(uri: unknown): string {
   if (!uri) return '-'
   const value = String(uri)
   const q = value.indexOf('?')
   return q >= 0 ? value.slice(0, q) : value
 }
 
-function durationToMs(value) {
+function durationToMs(value: unknown): number | null {
   const n = Number(value)
   if (!Number.isFinite(n) || n <= 0) return null
-  // Caddy duration is typically in seconds; larger values may already be ms.
   return n < 10 ? n * 1000 : n
 }
 
-function ageLabel(timestampMs, nowMs) {
-  const diff = Math.max(0, Math.floor((nowMs - Number(timestampMs || nowMs)) / 1000))
+function ageLabel(timestampMs: number | undefined, nowMs: number): string {
+  const diff = Math.max(0, Math.floor((nowMs - Number(timestampMs ?? nowMs)) / 1000))
   if (diff < 60) return `${diff}s`
   const m = Math.floor(diff / 60)
   if (m < 60) return `${m}m`
@@ -29,27 +57,27 @@ function ageLabel(timestampMs, nowMs) {
   return `${h}h`
 }
 
-function parseLine(line, source) {
+function parseLine(line: string, source: string): LogEntry {
   const now = new Date()
   const nowMs = now.getTime()
   if (source === 'caddy') {
     try {
-      const parsed = JSON.parse(line)
-      const req = parsed?.request || {}
+      const parsed = JSON.parse(line) as ApiData
+      const req = (parsed?.request as ApiData) || {}
       const statusCode = Number(parsed?.status || 0)
-      const method = req?.method || '-'
+      const method = (req?.method as string) || '-'
       const path = normalizePath(req?.uri)
       const latencyMs = durationToMs(parsed?.duration)
-      const level = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'ok'
+      const level: LogLevel = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'ok'
       return {
         id: `${source}-${parsed?.ts || nowMs}-${Math.random()}`,
-        ts: typeof parsed?.ts === 'number' ? new Date(parsed.ts * 1000).toLocaleTimeString() : now.toLocaleTimeString(),
-        at: typeof parsed?.ts === 'number' ? Math.round(parsed.ts * 1000) : nowMs,
+        ts: typeof parsed?.ts === 'number' ? new Date((parsed.ts as number) * 1000).toLocaleTimeString() : now.toLocaleTimeString(),
+        at: typeof parsed?.ts === 'number' ? Math.round((parsed.ts as number) * 1000) : nowMs,
         level,
         source,
         eventType: 'http_access',
         target: `${method} ${path}`,
-        actor: req?.remote_ip || req?.client_ip || '-',
+        actor: (req?.remote_ip || req?.client_ip || '-') as string,
         code: statusCode || null,
         latencyMs,
         summary: `${method} ${path} (${statusCode || '-'})`,
@@ -61,7 +89,7 @@ function parseLine(line, source) {
   }
 
   const lowered = String(line).toLowerCase()
-  const level = lowered.includes('error') ? 'error' : lowered.includes('warn') ? 'warn' : 'info'
+  const level: LogLevel = lowered.includes('error') ? 'error' : lowered.includes('warn') ? 'warn' : 'info'
   const codeMatch = String(line).match(/\b([1-5][0-9]{2})\b/)
   return {
     id: `${source}-${nowMs}-${Math.random()}`,
@@ -79,46 +107,51 @@ function parseLine(line, source) {
   }
 }
 
-function ragFromHealth(ok) {
+function ragFromHealth(ok: boolean): RagStatus {
   return ok ? 'green' : 'red'
 }
 
-function levelChip(level) {
+function levelChip(level: LogLevel): { label: string; color: 'error' | 'warning' | 'success' | 'default' } {
   if (level === 'error') return { label: 'ERR', color: 'error' }
   if (level === 'warn') return { label: 'WARN', color: 'warning' }
   if (level === 'ok') return { label: 'OK', color: 'success' }
   return { label: 'INFO', color: 'default' }
 }
 
+interface LineCache {
+  queue: string[]
+  set: Set<string>
+}
+
 function Logs() {
-  const [entries, setEntries] = useState([])
+  const [entries, setEntries] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [streamError, setStreamError] = useState('')
-  const [enabledSources, setEnabledSources] = useState(FILE_SOURCES)
+  const [enabledSources, setEnabledSources] = useState<string[]>(FILE_SOURCES)
   const [filterSource, setFilterSource] = useState('all')
   const [query, setQuery] = useState('')
   const [nowMs, setNowMs] = useState(Date.now())
-  const [sidecarState, setSidecarState] = useState({})
-  const lastSidecarRef = useRef({})
-  const recentSourceLinesRef = useRef({})
+  const [sidecarState, setSidecarState] = useState<Record<string, ApiData>>({})
+  const lastSidecarRef = useRef<Record<string, boolean>>({})
+  const recentSourceLinesRef = useRef<Record<string, LineCache>>({})
 
-  const pushEntry = (entry) => {
+  const pushEntry = (entry: LogEntry) => {
     setEntries((prev) => {
       const next = [entry, ...prev]
       return next.length > 1000 ? next.slice(0, 1000) : next
     })
   }
 
-  const shouldEmitSourceLine = (source, rawLine) => {
+  const shouldEmitSourceLine = (source: string, rawLine: string): boolean => {
     const maxCache = 400
-    const cache = recentSourceLinesRef.current[source] || { queue: [], set: new Set() }
+    const cache: LineCache = recentSourceLinesRef.current[source] || { queue: [], set: new Set() }
     if (cache.set.has(rawLine)) {
       return false
     }
     cache.queue.push(rawLine)
     cache.set.add(rawLine)
     while (cache.queue.length > maxCache) {
-      const dropped = cache.queue.shift()
+      const dropped = cache.queue.shift()!
       cache.set.delete(dropped)
     }
     recentSourceLinesRef.current[source] = cache
@@ -132,11 +165,11 @@ function Logs() {
 
   useEffect(() => {
     let active = true
-    const controllers = []
-    const inFlight = new Set()
-    let pollTimer = null
+    const controllers: AbortController[] = []
+    const inFlight = new Set<string>()
+    let pollTimer: ReturnType<typeof setInterval> | null = null
 
-    const pollSource = async (source) => {
+    const pollSource = async (source: string) => {
       if (inFlight.has(source)) return
       inFlight.add(source)
       const controller = new AbortController()
@@ -154,9 +187,10 @@ function Logs() {
             pushEntry(parseLine(line, source))
           },
         })
-      } catch (err) {
+      } catch (err: unknown) {
+        const e = err as { message?: string }
         if (!active || controller.signal.aborted) return
-        setStreamError((prev) => `${prev}${prev ? ' | ' : ''}${source}: ${err?.message || 'stream failed'}`)
+        setStreamError((prev) => `${prev}${prev ? ' | ' : ''}${source}: ${e?.message || 'stream failed'}`)
       } finally {
         inFlight.delete(source)
       }
@@ -168,7 +202,7 @@ function Logs() {
       let sourcesToOpen = FILE_SOURCES
       try {
         const attestation = await clientsApi.getAttestationSummary()
-        const availableMap = attestation?.data?.log_sources || {}
+        const availableMap = ((attestation?.data as ApiData)?.log_sources as Record<string, unknown>) || {}
         const available = FILE_SOURCES.filter((name) => availableMap[name] !== false)
         sourcesToOpen = available.length > 0 ? available : FILE_SOURCES
         if (active) setEnabledSources(sourcesToOpen)
@@ -197,9 +231,9 @@ function Logs() {
   }, [])
 
   useEffect(() => {
-    const onKeydown = (event) => {
+    const onKeydown = (event: KeyboardEvent) => {
       if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return
-      const target = event.target
+      const target = event.target as HTMLElement | null
       const tag = target?.tagName?.toLowerCase()
       if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) return
       event.preventDefault()
@@ -219,7 +253,7 @@ function Logs() {
         const metrics = await clientsApi.getMetricsSummary()
         if (!active) return
 
-        const sidecars = metrics?.data?.runtime?.sidecars || {}
+        const sidecars = ((metrics?.data as ApiData)?.runtime as ApiData)?.sidecars as Record<string, ApiData> || {}
         setSidecarState(sidecars)
 
         Object.entries(sidecars).forEach(([name, payload]) => {
@@ -233,7 +267,6 @@ function Logs() {
             || payload?.db_age_hours
             || '-'
 
-          // Always emit periodic sidecar snapshots so unified logs include sidecar feeds continuously.
           pushEntry({
             id: `sidecar-snapshot-${name}-${Date.now()}-${Math.random()}`,
             ts: new Date().toLocaleTimeString(),
@@ -281,7 +314,7 @@ function Logs() {
   }, [])
 
   const telemetry = useMemo(() => {
-    const counts = { error: 0, warn: 0, ok: 0, info: 0 }
+    const counts: Record<LogLevel, number> = { error: 0, warn: 0, ok: 0, info: 0 }
     entries.forEach((entry) => {
       counts[entry.level] = (counts[entry.level] || 0) + 1
     })
@@ -311,7 +344,7 @@ function Logs() {
     detail: entry.detail,
   }))
 
-  const columns = [
+  const columns: GridColDef[] = [
     { field: 'age', headerName: 'Age', flex: 0.28, minWidth: 72 },
     { field: 'source', headerName: 'Source', flex: 0.6, minWidth: 130 },
     {
@@ -320,7 +353,7 @@ function Logs() {
       flex: 0.35,
       minWidth: 96,
       renderCell: (params) => {
-        const cfg = levelChip(params.value)
+        const cfg = levelChip(params.value as LogLevel)
         return <Chip size="small" label={cfg.label} color={cfg.color} />
       },
     },
@@ -331,14 +364,14 @@ function Logs() {
       headerName: 'Code',
       flex: 0.34,
       minWidth: 78,
-      valueFormatter: (value) => (value === null || value === undefined ? '-' : String(value)),
+      valueFormatter: (value: unknown) => (value === null || value === undefined ? '-' : String(value)),
     },
     {
       field: 'latencyMs',
       headerName: 'Latency',
       flex: 0.45,
       minWidth: 95,
-      valueFormatter: (value) => (Number.isFinite(Number(value)) ? `${Math.round(Number(value))}ms` : '-'),
+      valueFormatter: (value: unknown) => (Number.isFinite(Number(value)) ? `${Math.round(Number(value))}ms` : '-'),
     },
     { field: 'actor', headerName: 'Actor', flex: 0.45, minWidth: 100 },
     { field: 'summary', headerName: 'Summary', flex: 1.1, minWidth: 220 },
@@ -356,7 +389,7 @@ function Logs() {
   }, [latencySample])
 
   const topTarget = useMemo(() => {
-    const counts = new Map()
+    const counts = new Map<string, number>()
     entries.forEach((entry) => {
       const target = entry.target || '-'
       counts.set(target, (counts.get(target) || 0) + 1)
@@ -373,7 +406,7 @@ function Logs() {
   }, [entries])
 
   const errorTarget = useMemo(() => {
-    const counts = new Map()
+    const counts = new Map<string, number>()
     entries
       .filter((entry) => entry.level === 'error' || entry.level === 'warn')
       .forEach((entry) => {
@@ -395,13 +428,13 @@ function Logs() {
   const sourceCoverageLive = enabledSources.length + Object.values(sidecarState).filter((value) => value?.available).length
   const uniqueSources = new Set(entries.map((entry) => entry.source)).size
   const visibleRatio = entries.length > 0 ? (rows.length / entries.length) * 100 : 0
-  const dominantLevel = ['error', 'warn', 'ok', 'info'].reduce((best, level) => {
+  const dominantLevel = (['error', 'warn', 'ok', 'info'] as LogLevel[]).reduce<LogLevel | null>((best, level) => {
     if (!best) return level
     return telemetry[level] > telemetry[best] ? level : best
   }, null)
   const newestTs = entries[0]?.ts || '-'
 
-  const topCards = [
+  const topCards: CardItem[] = [
     {
       key: 'mesh',
       title: 'STREAM MESH',

@@ -12,13 +12,20 @@ vi.mock('../services/api', () => ({
   },
 }))
 
+const mockedClientsApi = clientsApi as unknown as {
+  getStats: ReturnType<typeof vi.fn>
+  getMetricsSummary: ReturnType<typeof vi.fn>
+  getAttestationSummary: ReturnType<typeof vi.fn>
+  streamCaddyAccessLog: ReturnType<typeof vi.fn>
+}
+
 describe('Dashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   it('renders cross-tab summary cards', async () => {
-    clientsApi.getStats.mockResolvedValue({
+    mockedClientsApi.getStats.mockResolvedValue({
       data: {
         total_clients: 8,
         active_clients: 5,
@@ -26,7 +33,7 @@ describe('Dashboard', () => {
       },
     })
 
-    clientsApi.getMetricsSummary.mockResolvedValue({
+    mockedClientsApi.getMetricsSummary.mockResolvedValue({
       data: {
         runtime: {
           backend: { error_rate_percent: 0.5, p95_latency_ms: 120 },
@@ -39,7 +46,7 @@ describe('Dashboard', () => {
       },
     })
 
-    clientsApi.getAttestationSummary.mockResolvedValue({
+    mockedClientsApi.getAttestationSummary.mockResolvedValue({
       data: {
         security: {
           remediation: {
@@ -56,9 +63,9 @@ describe('Dashboard', () => {
     )
 
     await waitFor(() => {
-      expect(clientsApi.getStats).toHaveBeenCalledTimes(1)
-      expect(clientsApi.getMetricsSummary).toHaveBeenCalledTimes(1)
-      expect(clientsApi.getAttestationSummary).toHaveBeenCalledTimes(1)
+      expect(mockedClientsApi.getStats).toHaveBeenCalledTimes(1)
+      expect(mockedClientsApi.getMetricsSummary).toHaveBeenCalledTimes(1)
+      expect(mockedClientsApi.getAttestationSummary).toHaveBeenCalledTimes(1)
     })
 
     expect(await screen.findByText(/Mission Gate/)).toBeInTheDocument()
@@ -70,14 +77,14 @@ describe('Dashboard', () => {
   })
 
   it('still renders cards when values are zero', async () => {
-    clientsApi.getStats.mockResolvedValue({
+    mockedClientsApi.getStats.mockResolvedValue({
       data: {
         total_clients: 0,
         active_clients: 0,
         connected_clients: 0,
       },
     })
-    clientsApi.getMetricsSummary.mockResolvedValue({
+    mockedClientsApi.getMetricsSummary.mockResolvedValue({
       data: {
         runtime: {
           backend: { error_rate_percent: 0, p95_latency_ms: 0 },
@@ -86,7 +93,7 @@ describe('Dashboard', () => {
         source_probes: [],
       },
     })
-    clientsApi.getAttestationSummary.mockResolvedValue({
+    mockedClientsApi.getAttestationSummary.mockResolvedValue({
       data: {
         security: {
           remediation: {

@@ -2,15 +2,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { Box } from '@mui/material'
 import { clientsApi } from '../services/api'
 import { DenseCards, DenseGrid, DenseMetricCard, DenseSection } from '../components/dense/CyberUi'
+import type { RagStatus } from '../components/dense/CyberUi'
+
+type ApiData = Record<string, unknown>
 
 const TREND_WINDOW = 24
 
-function formatNumber(value, digits = 2) {
+function formatNumber(value: unknown, digits = 2): string {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
   return Number(value).toLocaleString(undefined, { maximumFractionDigits: digits })
 }
 
-function formatBytes(value) {
+function formatBytes(value: unknown): string {
   const n = Number(value)
   if (!Number.isFinite(n) || n < 0) return '-'
   if (n < 1024) return `${Math.round(n)} B`
@@ -19,27 +22,24 @@ function formatBytes(value) {
   return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
 
-function formatTimestamp(value) {
+function formatTimestamp(value: unknown): string {
   if (!value) return '-'
-  const parsed = new Date(value)
+  const parsed = new Date(value as string)
   if (Number.isNaN(parsed.getTime())) return '-'
   return parsed.toLocaleString()
 }
 
-function withObserved(hint, payload) {
+function withObserved(hint: string, payload: ApiData): string {
   return `${hint} | obs ${formatTimestamp(payload?.observed_at)}`
 }
 
-function appendTrend(history, key, value) {
+function appendTrend(history: Record<string, number[]>, key: string, value: unknown): Record<string, number[]> {
   if (!Number.isFinite(Number(value))) return history
   const current = Array.isArray(history[key]) ? history[key] : []
-  return {
-    ...history,
-    [key]: [...current, Number(value)].slice(-TREND_WINDOW),
-  }
+  return { ...history, [key]: [...current, Number(value)].slice(-TREND_WINDOW) }
 }
 
-function percentStatus(value, greenMin = 100, amberMin = 80) {
+function percentStatus(value: unknown, greenMin = 100, amberMin = 80): RagStatus {
   if (!Number.isFinite(Number(value))) return 'amber'
   const n = Number(value)
   if (n >= greenMin) return 'green'
@@ -47,7 +47,7 @@ function percentStatus(value, greenMin = 100, amberMin = 80) {
   return 'red'
 }
 
-function thresholdStatus(value, greenMax, amberMax) {
+function thresholdStatus(value: unknown, greenMax: number, amberMax: number): RagStatus {
   if (!Number.isFinite(Number(value))) return 'amber'
   const n = Number(value)
   if (n <= greenMax) return 'green'
@@ -55,7 +55,7 @@ function thresholdStatus(value, greenMax, amberMax) {
   return 'red'
 }
 
-function thresholdMinStatus(value, redMin, amberMin) {
+function thresholdMinStatus(value: unknown, redMin: number, amberMin: number): RagStatus {
   if (!Number.isFinite(Number(value))) return 'amber'
   const n = Number(value)
   if (n < redMin) return 'red'
@@ -63,7 +63,18 @@ function thresholdMinStatus(value, redMin, amberMin) {
   return 'green'
 }
 
-function sidecarDomainCards(name, payload) {
+interface CardItem {
+  key: string
+  title: string
+  value: string
+  hint: string
+  status: RagStatus
+  importance?: string
+  progressPercent?: number | null
+  probeKey?: string
+}
+
+function sidecarDomainCards(name: string, payload: ApiData): CardItem[] {
   if (payload?.configured === false) {
     return [
       {
@@ -77,7 +88,7 @@ function sidecarDomainCards(name, payload) {
     ]
   }
 
-  const baseStatus = payload?.available ? 'green' : 'red'
+  const baseStatus: RagStatus = payload?.available ? 'green' : 'red'
 
   if (name === 'node_exporter') {
     return [
@@ -188,7 +199,7 @@ function sidecarDomainCards(name, payload) {
       {
         key: `${name}-version`,
         title: 'EBPF AGENT VERSION',
-        value: payload?.version || '-',
+        value: (payload?.version as string) || '-',
         hint: withObserved(`goroutines ${formatNumber(payload?.go_goroutines, 0)}`, payload),
         status: baseStatus,
       },
@@ -220,7 +231,7 @@ function sidecarDomainCards(name, payload) {
         key: `${name}-db-age`,
         title: 'TRIVY DB AGE',
         value: `${formatNumber(payload?.db_age_hours, 1)}h`,
-        hint: withObserved(`db v${payload?.db_version || '-'} engine v${payload?.version || '-'}`, payload),
+        hint: withObserved(`db v${String(payload?.db_version || '-')} engine v${String(payload?.version || '-')}`, payload),
         status: thresholdStatus(payload?.db_age_hours, 24, 72),
       },
       {
@@ -249,11 +260,11 @@ function sidecarDomainCards(name, payload) {
 }
 
 function Operations() {
-  const [metrics, setMetrics] = useState(null)
-  const [attestation, setAttestation] = useState(null)
+  const [metrics, setMetrics] = useState<ApiData | null>(null)
+  const [attestation, setAttestation] = useState<ApiData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [probeLatencyTrends, setProbeLatencyTrends] = useState({})
+  const [probeLatencyTrends, setProbeLatencyTrends] = useState<Record<string, number[]>>({})
 
   useEffect(() => {
     let active = true
@@ -267,10 +278,11 @@ function Operations() {
           clientsApi.getAttestationSummary(),
         ])
         if (!active) return
-        setMetrics(metricsRes.data)
-        setAttestation(attestationRes.data)
-      } catch (err) {
-        if (active) setError(err?.message || 'Failed to load operations console')
+        setMetrics(metricsRes.data as ApiData)
+        setAttestation(attestationRes.data as ApiData)
+      } catch (err: unknown) {
+        const e = err as { message?: string }
+        if (active) setError(e?.message || 'Failed to load operations console')
       } finally {
         if (active) setLoading(false)
       }
@@ -285,11 +297,11 @@ function Operations() {
   }, [])
 
   useEffect(() => {
-    const sidecars = metrics?.runtime?.sidecars || {}
+    const sidecars = ((metrics?.runtime as ApiData)?.sidecars as Record<string, ApiData>) || {}
     setProbeLatencyTrends((prev) => {
       let next = prev
       Object.entries(sidecars).forEach(([name, payload]) => {
-        const probes = Array.isArray(payload?.api_probes) ? payload.api_probes : []
+        const probes = Array.isArray(payload?.api_probes) ? (payload.api_probes as ApiData[]) : []
         probes.forEach((probe) => {
           const key = `${name}:${String(probe?.name || 'endpoint')}`
           next = appendTrend(next, key, probe?.latency_ms)
@@ -299,7 +311,7 @@ function Operations() {
     })
   }, [metrics])
 
-  const probeDeltaLabel = (probeKey) => {
+  const probeDeltaLabel = (probeKey: string): string => {
     const series = Array.isArray(probeLatencyTrends[probeKey]) ? probeLatencyTrends[probeKey] : []
     if (series.length < 2) return 'Δ warmup'
     const delta = Number(series[series.length - 1]) - Number(series[series.length - 2])
@@ -307,29 +319,38 @@ function Operations() {
     return `Δ ${sign}${delta.toFixed(1)}ms`
   }
 
-  const cards = useMemo(() => {
-    const probes = metrics?.source_probes || []
+  const cards = useMemo<CardItem[]>(() => {
+    const probes = (metrics?.source_probes as ApiData[]) || []
     const probeUp = probes.filter((probe) => probe.available).length
     const probePct = probes.length > 0 ? (probeUp / probes.length) * 100 : 0
 
-    const sidecars = metrics?.runtime?.sidecars || {}
+    const sidecars = ((metrics?.runtime as ApiData)?.sidecars as Record<string, ApiData>) || {}
     const sidecarEntries = Object.values(sidecars).filter((entry) => entry?.configured !== false)
     const sidecarUp = sidecarEntries.filter((entry) => entry?.available).length
     const sidecarPct = sidecarEntries.length > 0 ? (sidecarUp / sidecarEntries.length) * 100 : 0
 
-    const p95 = metrics?.runtime?.backend?.p95_latency_ms
-    const avg = metrics?.runtime?.backend?.avg_latency_ms
-    const errRate = metrics?.runtime?.backend?.error_rate_percent
-    const wgConfigured = metrics?.runtime?.wireguard?.configured_peers
-    const wgConnected = metrics?.runtime?.wireguard?.connected_peers
+    const backend = ((metrics?.runtime as ApiData)?.backend as ApiData) || {}
+    const p95 = backend?.p95_latency_ms
+    const avg = backend?.avg_latency_ms
+    const errRate = backend?.error_rate_percent
+    const wg = ((metrics?.runtime as ApiData)?.wireguard as ApiData) || {}
+    const wgConfigured = wg?.configured_peers
+    const wgConnected = wg?.connected_peers
     const wgPct = Number(wgConfigured) > 0 ? (Number(wgConnected || 0) / Number(wgConfigured || 1)) * 100 : null
-    const actionCritical = attestation?.security?.remediation?.actionable?.critical
-    const actionTotal = attestation?.security?.remediation?.actionable?.total
-    const artifactPct = attestation?.evidence?.combined?.percent
-    const sbomPct = attestation?.evidence?.sbom?.percent
-    const scanPct = attestation?.evidence?.scans?.percent
 
-    const vitals = [
+    const remediation = ((attestation?.security as ApiData)?.remediation as ApiData) || {}
+    const actionable = (remediation?.actionable as ApiData) || {}
+    const actionCritical = actionable?.critical
+    const actionTotal = actionable?.total
+    const evidence = (attestation?.evidence as ApiData) || {}
+    const combined = (evidence?.combined as ApiData) || {}
+    const sbom = (evidence?.sbom as ApiData) || {}
+    const scans = (evidence?.scans as ApiData) || {}
+    const artifactPct = combined?.percent
+    const sbomPct = sbom?.percent
+    const scanPct = scans?.percent
+
+    const vitals: CardItem[] = [
       {
         key: 'probe-cov',
         title: 'PROBE COVERAGE',
@@ -372,14 +393,14 @@ function Operations() {
         value: `${formatNumber(artifactPct, 0)}%`,
         hint: `sbom ${formatNumber(sbomPct, 0)}% | scan ${formatNumber(scanPct, 0)}%`,
         status: thresholdMinStatus(artifactPct, 80, 100),
-        progressPercent: artifactPct,
+        progressPercent: artifactPct as number | null | undefined,
         importance: 'Evidence completeness drives attestation confidence.',
       },
       {
         key: 'wg',
         title: 'MONITOR LINK READY',
         value: `${formatNumber(wgConnected, 0)}/${formatNumber(wgConfigured, 0)}`,
-        hint: `${metrics?.runtime?.wireguard?.interface || '-'} ${metrics?.runtime?.wireguard?.is_up ? 'up' : 'down'}`,
+        hint: `${(wg?.interface as string) || '-'} ${wg?.is_up ? 'up' : 'down'}`,
         status: thresholdMinStatus(wgPct, 50, 100),
         progressPercent: wgPct,
         importance: 'Secure monitor-link status is the service-level outcome.',
@@ -411,37 +432,33 @@ function Operations() {
     return vitals
   }, [attestation, error, loading, metrics])
 
-  const compositeCards = useMemo(() => {
-    const topKeys = [
-      'probe-cov',
-      'sidecar-cov',
-      'latency',
-      'critical',
-      'evidence-coverage',
-      'wg',
-    ]
+  const compositeCards = useMemo<CardItem[]>(() => {
+    const topKeys = ['probe-cov', 'sidecar-cov', 'latency', 'critical', 'evidence-coverage', 'wg']
     const selected = cards.filter((card) => topKeys.includes(card.key))
     const stateCards = cards.filter((card) => card.key === 'state-loading' || card.key === 'state-error')
     return [...stateCards, ...selected]
   }, [cards])
 
-  const statusFlagCards = useMemo(() => {
-    const sidecars = metrics?.runtime?.sidecars || {}
-    const wgUp = Boolean(metrics?.runtime?.wireguard?.is_up)
-    const lockout = Boolean(attestation?.policy?.auth_lockout_enabled)
-    const docsLocked = !(attestation?.surface?.api_docs_enabled)
-    const rateLimits = Boolean(attestation?.policy?.rate_limit_enabled)
+  const statusFlagCards = useMemo<CardItem[]>(() => {
+    const sidecars = ((metrics?.runtime as ApiData)?.sidecars as Record<string, ApiData>) || {}
+    const wg = ((metrics?.runtime as ApiData)?.wireguard as ApiData) || {}
+    const wgUp = Boolean(wg?.is_up)
+    const policy = (attestation?.policy as ApiData) || {}
+    const surface = (attestation?.surface as ApiData) || {}
+    const lockout = Boolean(policy?.auth_lockout_enabled)
+    const docsLocked = !(surface?.api_docs_enabled)
+    const rateLimits = Boolean(policy?.rate_limit_enabled)
     const crowdsecHealthy = String(sidecars?.crowdsec?.status || '').toLowerCase() === 'up' || Boolean(sidecars?.crowdsec?.healthy)
     const trivyFresh = Number(sidecars?.trivy_server?.db_age_hours || 9999) <= 24
     const parcaProfiling = Boolean(sidecars?.parca?.available)
-    const httpsActive = Boolean(attestation?.surface?.https_enabled)
+    const httpsActive = Boolean(surface?.https_enabled)
 
     return [
       {
         key: 'flag-wg-link',
         title: 'WG LINK UP',
         value: wgUp ? 'YES' : 'NO',
-        hint: `${metrics?.runtime?.wireguard?.interface || '-'} | peer ${formatNumber(metrics?.runtime?.wireguard?.connected_peers, 0)}/${formatNumber(metrics?.runtime?.wireguard?.configured_peers, 0)}`,
+        hint: `${(wg?.interface as string) || '-'} | peer ${formatNumber(wg?.connected_peers, 0)}/${formatNumber(wg?.configured_peers, 0)}`,
         status: wgUp ? 'green' : 'red',
       },
       {
@@ -496,26 +513,29 @@ function Operations() {
     ]
   }, [attestation, metrics])
 
-  const sidecarDomainSignalCards = Object.entries(metrics?.runtime?.sidecars || {})
+  const sidecarDomainSignalCards = Object.entries(((metrics?.runtime as ApiData)?.sidecars as Record<string, ApiData>) || {})
     .flatMap(([name, payload]) => sidecarDomainCards(name, payload))
 
-  const sidecarApiCards = Object.entries(metrics?.runtime?.sidecars || {})
+  const sidecarApiCards = Object.entries(((metrics?.runtime as ApiData)?.sidecars as Record<string, ApiData>) || {})
     .filter(([, payload]) => payload?.configured !== false)
     .flatMap(([name, payload]) => {
-      const probes = Array.isArray(payload?.api_probes) ? payload.api_probes : []
-      return probes.map((probe, idx) => ({
-        probeKey: `${name}:${String(probe?.name || 'endpoint')}`,
-        key: `sidecar-api-${name}-${idx}`,
-        title: `${name.toUpperCase()} API ${String(probe?.name || 'endpoint').toUpperCase()}`,
-        value: probe?.available ? `${formatNumber(probe?.status_code, 0)} OK` : `${formatNumber(probe?.status_code, 0)} FAIL`,
-        hint: `${formatNumber(probe?.latency_ms, 1)} ms | ${probeDeltaLabel(`${name}:${String(probe?.name || 'endpoint')}`)} | obs ${formatTimestamp(probe?.observed_at)}`,
-        status: probe?.available ? 'green' : 'red',
-        progressPercent: Number.isFinite(Number(probe?.latency_ms)) ? Math.max(0, 100 - Number(probe.latency_ms) / 10) : undefined,
-        importance: probe?.error || `${(probe?.url || '').replace(/^https?:\/\//, '')} | ${formatNumber(probe?.response_bytes, 0)} bytes | ${probe?.content_type || 'unknown content-type'}`,
-      }))
+      const probes = Array.isArray(payload?.api_probes) ? (payload.api_probes as ApiData[]) : []
+      return probes.map((probe, idx) => {
+        const probeKey = `${name}:${String(probe?.name || 'endpoint')}`
+        return {
+          probeKey,
+          key: `sidecar-api-${name}-${idx}`,
+          title: `${name.toUpperCase()} API ${String(probe?.name || 'endpoint').toUpperCase()}`,
+          value: probe?.available ? `${formatNumber(probe?.status_code, 0)} OK` : `${formatNumber(probe?.status_code, 0)} FAIL`,
+          hint: `${formatNumber(probe?.latency_ms, 1)} ms | ${probeDeltaLabel(probeKey)} | obs ${formatTimestamp(probe?.observed_at)}`,
+          status: probe?.available ? ('green' as RagStatus) : ('red' as RagStatus),
+          progressPercent: Number.isFinite(Number(probe?.latency_ms)) ? Math.max(0, 100 - Number(probe.latency_ms) / 10) : undefined,
+          importance: (probe?.error as string) || `${String(probe?.url || '').replace(/^https?:\/\//, '')} | ${formatNumber(probe?.response_bytes, 0)} bytes | ${String(probe?.content_type || 'unknown content-type')}`,
+        }
+      })
     })
 
-  const insightCards = (attestation?.insights || []).map((insight, idx) => ({
+  const insightCards: CardItem[] = ((attestation?.insights as string[]) || []).map((insight, idx) => ({
     key: `insight-${idx}`,
     title: `OP INSIGHT ${idx + 1}`,
     value: insight.toLowerCase().includes('critical') ? 'CRITICAL' : insight.toLowerCase().includes('warning') ? 'WATCH' : 'INFO',
@@ -536,7 +556,7 @@ function Operations() {
                 value={card.value}
                 hint={card.hint}
                 status={card.status}
-                progressPercent={card.progressPercent}
+                progressPercent={card.progressPercent ?? undefined}
                 importance={card.importance}
               />
             ))}
@@ -583,7 +603,7 @@ function Operations() {
                 hint={card.hint}
                 status={card.status}
                 importance={card.importance}
-                progressPercent={card.progressPercent}
+                progressPercent={card.progressPercent ?? undefined}
               />
             ))}
           </DenseCards>

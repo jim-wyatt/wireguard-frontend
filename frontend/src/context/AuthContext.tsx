@@ -1,13 +1,20 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 
-const AuthContext = createContext()
+interface AuthContextValue {
+  token: string | null
+  isAuthenticated: boolean
+  login: (newToken: string) => void
+  logout: () => void
+}
 
-export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => {
+const AuthContext = createContext<AuthContextValue | undefined>(undefined)
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [token, setToken] = useState<string | null>(() => {
     return window.localStorage.getItem('apiToken') || null
   })
 
-  const login = useCallback((newToken) => {
+  const login = useCallback((newToken: string) => {
     window.localStorage.setItem('apiToken', newToken)
     setToken(newToken)
   }, [])
@@ -26,7 +33,7 @@ export function AuthProvider({ children }) {
   )
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext)
   if (!context) {
     throw new Error('useAuth must be used within AuthProvider')

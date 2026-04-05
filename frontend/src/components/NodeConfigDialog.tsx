@@ -15,22 +15,31 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import DownloadIcon from '@mui/icons-material/Download'
 import { clientsApi } from '../services/api'
 
-function NodeConfigDialog({ open, onClose, nodeId, nodeEmail }) {
-  const [config, setConfig] = useState(null)
-  const [qrCode, setQrCode] = useState(null)
+interface NodeConfigDialogProps {
+  open: boolean
+  onClose: () => void
+  nodeId?: number | string
+  nodeEmail?: string
+}
+
+function NodeConfigDialog({ open, onClose, nodeId, nodeEmail }: NodeConfigDialogProps) {
+  const [config, setConfig] = useState<string | null>(null)
+  const [qrCode, setQrCode] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
   const loadConfig = useCallback(async () => {
+    if (!nodeId) return
     setLoading(true)
     setError(null)
     try {
       const response = await clientsApi.getClientConfig(nodeId)
-      setConfig(response.data.config)
-      setQrCode(response.data.qr_code)
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to load configuration')
+      setConfig(response.data.config as string)
+      setQrCode(response.data.qr_code as string)
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { detail?: string } } }
+      setError(axiosErr.response?.data?.detail || 'Failed to load configuration')
     } finally {
       setLoading(false)
     }
@@ -43,12 +52,14 @@ function NodeConfigDialog({ open, onClose, nodeId, nodeEmail }) {
   }, [open, nodeId, loadConfig])
 
   const handleCopy = () => {
+    if (!config) return
     navigator.clipboard.writeText(config)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
   const handleDownload = () => {
+    if (!config) return
     const blob = new Blob([config], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -87,9 +98,11 @@ function NodeConfigDialog({ open, onClose, nodeId, nodeEmail }) {
                 fullWidth
                 rows={12}
                 value={config || ''}
-                InputProps={{
-                  readOnly: true,
-                  sx: { fontFamily: 'monospace', fontSize: '0.9rem' },
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                    sx: { fontFamily: 'monospace', fontSize: '0.9rem' },
+                  },
                 }}
               />
               <IconButton

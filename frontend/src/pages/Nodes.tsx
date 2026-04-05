@@ -9,7 +9,7 @@ import {
   Snackbar,
   Typography,
 } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
+import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import DownloadIcon from '@mui/icons-material/Download'
@@ -20,21 +20,47 @@ import NodeConfigDialog from '../components/NodeConfigDialog'
 import { clientsApi } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { DenseCards, DenseGrid, DenseMetricCard, DenseSection } from '../components/dense/CyberUi'
+import type { RagStatus } from '../components/dense/CyberUi'
+
+interface Node {
+  id: number
+  email: string
+  name?: string
+  ip_address: string
+  is_active: boolean
+  created_at?: string
+  config_downloaded: boolean
+}
+
+interface CardItem {
+  key: string
+  title: string
+  value: string
+  hint: string
+  status: RagStatus
+  importance: string
+}
+
+interface SnackbarState {
+  open: boolean
+  message: string
+  severity: 'success' | 'error' | 'warning' | 'info'
+}
 
 function Nodes() {
   const { isAuthenticated } = useAuth()
-  const [clients, setClients] = useState([])
+  const [clients, setClients] = useState<Node[]>([])
   const [loading, setLoading] = useState(true)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [configDialogOpen, setConfigDialogOpen] = useState(false)
-  const [selectedNode, setSelectedNode] = useState(null)
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' })
+  const [selectedNode, setSelectedNode] = useState<Node | null>(null)
+  const [snackbar, setSnackbar] = useState<SnackbarState>({ open: false, message: '', severity: 'success' })
 
   const loadClients = useCallback(async () => {
     setLoading(true)
     try {
       const response = await clientsApi.getClients()
-      setClients(response.data)
+      setClients(response.data as Node[])
     } catch {
       showSnackbar('Failed to load nodes', 'error')
     } finally {
@@ -46,7 +72,7 @@ function Nodes() {
     loadClients()
   }, [loadClients])
 
-  const showSnackbar = (message, severity = 'success') => {
+  const showSnackbar = (message: string, severity: SnackbarState['severity'] = 'success') => {
     setSnackbar({ open: true, message, severity })
   }
 
@@ -55,7 +81,7 @@ function Nodes() {
     showSnackbar('Node created successfully')
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: number) => {
     if (!isAuthenticated) {
       showSnackbar('Login required for node management actions', 'warning')
       return
@@ -71,7 +97,7 @@ function Nodes() {
     }
   }
 
-  const handleToggle = async (id) => {
+  const handleToggle = async (id: number) => {
     if (!isAuthenticated) {
       showSnackbar('Login required for node management actions', 'warning')
       return
@@ -85,7 +111,7 @@ function Nodes() {
     }
   }
 
-  const handleShowConfig = (node) => {
+  const handleShowConfig = (node: Node) => {
     if (!isAuthenticated) {
       showSnackbar('Login required to download node configuration', 'warning')
       return
@@ -94,7 +120,7 @@ function Nodes() {
     setConfigDialogOpen(true)
   }
 
-  const columns = [
+  const columns: GridColDef<Node>[] = [
     {
       field: 'email',
       headerName: 'Email',
@@ -106,15 +132,15 @@ function Nodes() {
       headerName: 'Name',
       flex: 0.7,
       minWidth: 150,
-      renderCell: (params) => params.row?.name || '-',
+      renderCell: (params: GridRenderCellParams<Node>) => params.row?.name || '-',
     },
     {
       field: 'ip_address',
       headerName: 'IP Address',
       flex: 0.6,
       minWidth: 130,
-      renderCell: (params) => (
-        <Chip label={params.value} size="small" />
+      renderCell: (params: GridRenderCellParams<Node>) => (
+        <Chip label={params.value as string} size="small" />
       ),
     },
     {
@@ -122,7 +148,7 @@ function Nodes() {
       headerName: 'Status',
       flex: 0.5,
       minWidth: 100,
-      renderCell: (params) => (
+      renderCell: (params: GridRenderCellParams<Node>) => (
         <Chip
           label={params.value ? 'Active' : 'Inactive'}
           color={params.value ? 'success' : 'default'}
@@ -135,7 +161,7 @@ function Nodes() {
       headerName: 'Created',
       flex: 0.7,
       minWidth: 180,
-      renderCell: (params) => {
+      renderCell: (params: GridRenderCellParams<Node>) => {
         const createdAt = params.row?.created_at
         if (!createdAt) return '-'
         const parsed = new Date(createdAt)
@@ -147,7 +173,7 @@ function Nodes() {
       headerName: 'Config Downloaded',
       flex: 0.5,
       minWidth: 110,
-      renderCell: (params) => (
+      renderCell: (params: GridRenderCellParams<Node>) => (
         <Chip
           label={params.value ? 'Yes' : 'No'}
           color={params.value ? 'info' : 'default'}
@@ -162,7 +188,7 @@ function Nodes() {
       flex: 0.7,
       minWidth: 150,
       sortable: false,
-      renderCell: (params) => (
+      renderCell: (params: GridRenderCellParams<Node>) => (
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <IconButton
             size="small"
@@ -208,7 +234,7 @@ function Nodes() {
   const activeRatio = totalNodes > 0 ? (activeNodes / totalNodes) * 100 : 0
   const adoptionRatio = totalNodes > 0 ? (downloadedCount / totalNodes) * 100 : 0
 
-  const summaryCards = [
+  const summaryCards: CardItem[] = [
     {
       key: 'total',
       title: 'TOTAL RECORDS',

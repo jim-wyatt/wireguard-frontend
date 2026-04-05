@@ -2,11 +2,29 @@ import { useEffect, useMemo, useState } from 'react'
 import { Box } from '@mui/material'
 import { clientsApi } from '../services/api'
 import { DenseCards, DenseGrid, DenseMetricCard, DenseSection } from '../components/dense/CyberUi'
+import type { RagStatus } from '../components/dense/CyberUi'
+
+interface CardItem {
+  key: string
+  title: string
+  value: string
+  hint: string
+  status: RagStatus
+  importance?: string
+}
+
+interface NodeStats {
+  total_clients?: number
+  active_clients?: number
+  connected_clients?: number
+}
+
+type ApiData = Record<string, unknown>
 
 function Dashboard() {
-  const [clientStats, setClientStats] = useState(null)
-  const [metrics, setMetrics] = useState(null)
-  const [attestation, setAttestation] = useState(null)
+  const [clientStats, setClientStats] = useState<NodeStats | null>(null)
+  const [metrics, setMetrics] = useState<ApiData | null>(null)
+  const [attestation, setAttestation] = useState<ApiData | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -24,38 +42,50 @@ function Dashboard() {
         clientsApi.getMetricsSummary(),
         clientsApi.getAttestationSummary(),
       ])
-      setClientStats(statsRes.data)
-      setMetrics(metricsRes.data)
-      setAttestation(attestationRes.data)
-    } catch (err) {
-      setError(err?.response?.data?.detail || err?.message || 'Failed to load dashboard data')
+      setClientStats(statsRes.data as NodeStats)
+      setMetrics(metricsRes.data as ApiData)
+      setAttestation(attestationRes.data as ApiData)
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } }; message?: string }
+      setError(e?.response?.data?.detail || e?.message || 'Failed to load dashboard data')
     } finally {
       setLoading(false)
     }
   }
 
   const overviewCards = useMemo(() => {
-    const probes = metrics?.source_probes || []
+    const runtime = (metrics?.runtime as ApiData) || {}
+    const probes = (metrics?.source_probes as ApiData[]) || []
     const probesUp = probes.filter((p) => p.available).length
-    const actionable = attestation?.security?.remediation?.actionable || {}
-    const evidencePct = Number(attestation?.evidence?.combined?.percent || 0)
-    const wireguardUp = Boolean(metrics?.runtime?.wireguard?.is_up)
+    const securityData = (attestation?.security as ApiData) || {}
+    const remediationData = (securityData?.remediation as ApiData) || {}
+    const actionable = (remediationData?.actionable as ApiData) || {}
+    const evidenceData = (attestation?.evidence as ApiData) || {}
+    const combinedEvidence = (evidenceData?.combined as ApiData) || {}
+    const evidencePct = Number(combinedEvidence?.percent || 0)
+    const insights = (attestation?.insights as unknown[]) || []
+    const wireguardData = (runtime?.wireguard as ApiData) || {}
+    const wireguardUp = Boolean(wireguardData?.is_up)
     const connected = Number(clientStats?.connected_clients || 0)
     const active = Number(clientStats?.active_clients || 0)
     const total = Number(clientStats?.total_clients || 0)
     const adoptionPct = active > 0 ? (connected / active) * 100 : 0
-    const p95 = Number(metrics?.runtime?.backend?.p95_latency_ms || 0)
-    const avgLatency = Number(metrics?.runtime?.backend?.avg_latency_ms || 0)
-    const errRate = Number(metrics?.runtime?.backend?.error_rate_percent || 0)
-    const inflight = Number(metrics?.runtime?.caddy?.requests_in_flight || 0)
-    const backendReq = Number(metrics?.runtime?.backend?.requests_total || 0)
-    const insightCount = Number((attestation?.insights || []).length)
-    const sidecars = metrics?.runtime?.sidecars || {}
+    const backendData = (runtime?.backend as ApiData) || {}
+    const p95 = Number(backendData?.p95_latency_ms || 0)
+    const avgLatency = Number(backendData?.avg_latency_ms || 0)
+    const errRate = Number(backendData?.error_rate_percent || 0)
+    const caddyData = (runtime?.caddy as ApiData) || {}
+    const inflight = Number(caddyData?.requests_in_flight || 0)
+    const backendReq = Number(backendData?.requests_total || 0)
+    const insightCount = Number(insights.length)
+    const sidecars = (runtime?.sidecars as Record<string, ApiData>) || {}
     const sidecarEntries = Object.values(sidecars).filter((item) => item?.configured !== false)
     const sidecarUp = sidecarEntries.filter((item) => item?.available).length
     const sidecarTotal = sidecarEntries.length
-    const trivyAge = Number(sidecars?.trivy_server?.db_age_hours || 0)
-    const crowdsecStatus = String(sidecars?.crowdsec?.status || 'unknown').toLowerCase()
+    const trivyServer = (sidecars?.trivy_server as ApiData) || {}
+    const trivyAge = Number(trivyServer?.db_age_hours || 0)
+    const crowdsecData = (sidecars?.crowdsec as ApiData) || {}
+    const crowdsecStatus = String(crowdsecData?.status || 'unknown').toLowerCase()
 
     const opsScoreParts = [
       wireguardUp ? 100 : 0,
@@ -66,7 +96,7 @@ function Dashboard() {
     ]
     const opsScore = Math.round(opsScoreParts.reduce((sum, v) => sum + v, 0) / opsScoreParts.length)
 
-    const cards = [
+    const cards: CardItem[] = [
       {
         key: 'clients',
         title: 'NODES TAB',
@@ -206,14 +236,14 @@ function Dashboard() {
     return cards
   }, [attestation, clientStats, error, loading, metrics])
 
-  const pickCard = (key) => overviewCards.find((card) => card.key === key)
+  const pickCard = (key: string) => overviewCards.find((card) => card.key === key)
 
   const missionGateCards = [
     pickCard('link-state'),
     pickCard('ops'),
     pickCard('client-adoption'),
     pickCard('attestation'),
-  ].filter(Boolean)
+  ].filter((c): c is CardItem => Boolean(c))
 
   const pipelineCards = [
     pickCard('logs'),
@@ -222,14 +252,14 @@ function Dashboard() {
     pickCard('log-load'),
     pickCard('sidecar-health'),
     pickCard('evidence'),
-  ].filter(Boolean)
+  ].filter((c): c is CardItem => Boolean(c))
 
   const quickIntelCards = [
     pickCard('clients'),
     pickCard('threat-intel-freshness'),
     pickCard('traffic-volume'),
     pickCard('insight-queue'),
-  ].filter(Boolean)
+  ].filter((c): c is CardItem => Boolean(c))
 
   const stateCards = overviewCards.filter((card) => card.key === 'error-state' || card.key === 'loading-state')
 

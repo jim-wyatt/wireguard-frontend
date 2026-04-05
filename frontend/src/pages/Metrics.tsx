@@ -2,10 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { Box } from '@mui/material'
 import { clientsApi } from '../services/api'
 import { DenseCards, DenseGrid, DenseMetricCard, DenseSection } from '../components/dense/CyberUi'
+import type { RagStatus } from '../components/dense/CyberUi'
+
+type ApiData = Record<string, unknown>
 
 const TREND_WINDOW = 24
 
-function formatBytes(value) {
+function formatBytes(value: unknown): string {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
   const bytes = Number(value)
   if (bytes <= 0) return '0 B'
@@ -15,39 +18,36 @@ function formatBytes(value) {
   return `${amount.toFixed(amount >= 100 ? 0 : amount >= 10 ? 1 : 2)} ${units[idx]}`
 }
 
-function formatNumber(value, maxDigits = 2) {
+function formatNumber(value: unknown, maxDigits = 2): string {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
   return Number(value).toLocaleString(undefined, { maximumFractionDigits: maxDigits })
 }
 
-function formatPercent(value, digits = 1) {
+function formatPercent(value: unknown, digits = 1): string {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
   return `${Number(value).toFixed(digits)}%`
 }
 
-function formatTimestamp(value) {
+function formatTimestamp(value: unknown): string {
   if (!value) return '-'
-  const parsed = new Date(value)
+  const parsed = new Date(value as string)
   if (Number.isNaN(parsed.getTime())) return '-'
   return parsed.toLocaleString()
 }
 
-function formatEpochSeconds(value) {
+function formatEpochSeconds(value: unknown): string {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '-'
   return new Date(Number(value) * 1000).toLocaleString()
 }
 
-function appendTrend(history, key, value) {
+function appendTrend(history: Record<string, number[]>, key: string, value: unknown): Record<string, number[]> {
   if (!Number.isFinite(Number(value))) return history
   const current = Array.isArray(history[key]) ? history[key] : []
   const next = [...current, Number(value)].slice(-TREND_WINDOW)
-  return {
-    ...history,
-    [key]: next,
-  }
+  return { ...history, [key]: next }
 }
 
-function thresholdStatus(value, greenMax, amberMax) {
+function thresholdStatus(value: unknown, greenMax: number, amberMax: number): RagStatus {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return 'amber'
   const n = Number(value)
   if (n <= greenMax) return 'green'
@@ -55,7 +55,7 @@ function thresholdStatus(value, greenMax, amberMax) {
   return 'red'
 }
 
-function thresholdMinStatus(value, redMin, amberMin) {
+function thresholdMinStatus(value: unknown, redMin: number, amberMin: number): RagStatus {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return 'amber'
   const n = Number(value)
   if (n < redMin) return 'red'
@@ -63,11 +63,22 @@ function thresholdMinStatus(value, redMin, amberMin) {
   return 'green'
 }
 
+interface CardItem {
+  key: string
+  title: string
+  value: string
+  hint: string
+  status: RagStatus
+  importance?: string
+  progressPercent?: number | null
+  trendKey?: string
+}
+
 function Metrics() {
-  const [data, setData] = useState(null)
+  const [data, setData] = useState<ApiData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [trendHistory, setTrendHistory] = useState({})
+  const [trendHistory, setTrendHistory] = useState<Record<string, number[]>>({})
 
   useEffect(() => {
     let active = true
@@ -77,9 +88,10 @@ function Metrics() {
       setError('')
       try {
         const response = await clientsApi.getMetricsSummary()
-        if (active) setData(response.data)
-      } catch (err) {
-        if (active) setError(err?.response?.data?.detail || err?.message || 'Failed to load metrics')
+        if (active) setData(response.data as ApiData)
+      } catch (err: unknown) {
+        const e = err as { response?: { data?: { detail?: string } }; message?: string }
+        if (active) setError(e?.response?.data?.detail || e?.message || 'Failed to load metrics')
       } finally {
         if (active) setLoading(false)
       }
@@ -93,51 +105,59 @@ function Metrics() {
     }
   }, [])
 
-  const runtime = data?.runtime || {}
-  const summary = data?.summary || {}
-  const sourceProbes = data?.source_probes || []
+  const runtime = (data?.runtime as ApiData) || {}
+  const summary = (data?.summary as ApiData) || {}
+  const sourceProbes = (data?.source_probes as ApiData[]) || []
 
-  const caddy = runtime?.caddy || {}
-  const backend = runtime?.backend || {}
-  const hostOs = runtime?.os || {}
-  const wireguard = runtime?.wireguard || {}
-  const sidecars = runtime?.sidecars || {}
-  const process = runtime?.process || {}
-  const go = runtime?.go || {}
-  const env = runtime?.environment || {}
+  const caddy = (runtime?.caddy as ApiData) || {}
+  const backend = (runtime?.backend as ApiData) || {}
+  const hostOs = (runtime?.os as ApiData) || {}
+  const wireguard = (runtime?.wireguard as ApiData) || {}
+  const sidecars = (runtime?.sidecars as Record<string, ApiData>) || {}
+  const process = (runtime?.process as ApiData) || {}
+  const go = (runtime?.go as ApiData) || {}
+  const env = (runtime?.environment as ApiData) || {}
 
   useEffect(() => {
     if (!data) return
 
-    const rt = data?.runtime || {}
-    const os = rt?.os || {}
-    const bk = rt?.backend || {}
-    const wg = rt?.wireguard || {}
-    const cd = rt?.caddy || {}
-    const pr = rt?.process || {}
-    const goRt = rt?.go || {}
-    const sc = rt?.sidecars || {}
+    const rt = (data?.runtime as ApiData) || {}
+    const os = (rt?.os as ApiData) || {}
+    const bk = (rt?.backend as ApiData) || {}
+    const wg = (rt?.wireguard as ApiData) || {}
+    const cd = (rt?.caddy as ApiData) || {}
+    const pr = (rt?.process as ApiData) || {}
+    const goRt = (rt?.go as ApiData) || {}
+    const sc = (rt?.sidecars as ApiData) || {}
 
-    const snapshot = {
-      host_cpu: os?.cpu?.usage_percent,
-      host_mem: os?.memory?.used_percent,
-      host_disk: os?.disk?.root?.usage_percent,
+    const cpuData = (os?.cpu as ApiData) || {}
+    const memData = (os?.memory as ApiData) || {}
+    const diskData = ((os?.disk as ApiData)?.root as ApiData) || {}
+    const upstreams = (cd?.reverse_proxy_upstreams as ApiData) || {}
+    const trivyServer = (sc?.trivy_server as ApiData) || {}
+
+    const snapshot: Record<string, unknown> = {
+      host_cpu: cpuData?.usage_percent,
+      host_mem: memData?.used_percent,
+      host_disk: diskData?.usage_percent,
       api_err: bk?.error_rate_percent,
       api_p95: bk?.p95_latency_ms,
       api_avg: bk?.avg_latency_ms,
       fd_usage: pr?.fd_usage_percent,
-      wg_peer_ratio: Number(wg?.configured_peers || 0) > 0 ? (Number(wg?.connected_peers || 0) / Number(wg?.configured_peers || 1)) * 100 : null,
+      wg_peer_ratio: Number(wg?.configured_peers || 0) > 0
+        ? (Number(wg?.connected_peers || 0) / Number(wg?.configured_peers || 1)) * 100
+        : null,
       wg_handshake_age_min: Number(wg?.latest_handshake_age_seconds || 0) / 60,
       caddy_reload_age: cd?.config_last_reload_age_seconds,
-      caddy_upstreams_ratio: Number(cd?.reverse_proxy_upstreams?.total || 0) > 0
-        ? (Number(cd?.reverse_proxy_upstreams?.healthy || 0) / Number(cd?.reverse_proxy_upstreams?.total || 1)) * 100
+      caddy_upstreams_ratio: Number(upstreams?.total || 0) > 0
+        ? (Number(upstreams?.healthy || 0) / Number(upstreams?.total || 1)) * 100
         : null,
-      host_net_rx: os?.network?.rx_bytes_total,
-      host_net_tx: os?.network?.tx_bytes_total,
+      host_net_rx: (os?.network as ApiData)?.rx_bytes_total,
+      host_net_tx: (os?.network as ApiData)?.tx_bytes_total,
       process_net_rx: pr?.network_receive_bytes_total,
       process_net_tx: pr?.network_transmit_bytes_total,
       go_gc_age: goRt?.last_gc_age_seconds,
-      trivy_db_age_h: sc?.trivy_server?.db_age_hours,
+      trivy_db_age_h: trivyServer?.db_age_hours,
     }
 
     setTrendHistory((prev) => {
@@ -149,13 +169,13 @@ function Metrics() {
     })
   }, [data])
 
-  const trendDelta = (key) => {
+  const trendDelta = (key: string): number | null => {
     const series = Array.isArray(trendHistory[key]) ? trendHistory[key] : []
     if (series.length < 2) return null
     return Number(series[series.length - 1]) - Number(series[series.length - 2])
   }
 
-  const deltaLabel = (key, digits = 1, suffix = '') => {
+  const deltaLabel = (key: string, digits = 1, suffix = ''): string => {
     const delta = trendDelta(key)
     if (!Number.isFinite(Number(delta))) return 'Δ warmup'
     const n = Number(delta)
@@ -166,48 +186,55 @@ function Metrics() {
   const availableProbes = sourceProbes.filter((probe) => probe.available).length
   const probeCoverage = sourceProbes.length > 0 ? (availableProbes / sourceProbes.length) * 100 : null
 
-  const primaryCards = useMemo(() => {
-    const caddyTotal = Number(caddy?.reverse_proxy_upstreams?.total || 0)
-    const caddyHealthy = Number(caddy?.reverse_proxy_upstreams?.healthy || 0)
+  const cpu = (hostOs?.cpu as ApiData) || {}
+  const cpuLoad = (cpu?.load as ApiData) || {}
+  const mem = (hostOs?.memory as ApiData) || {}
+  const disk = ((hostOs?.disk as ApiData)?.root as ApiData) || {}
+  const upstreams = (caddy?.reverse_proxy_upstreams as ApiData) || {}
+  const heap = (go?.heap as ApiData) || {}
+
+  const primaryCards = useMemo<CardItem[]>(() => {
+    const caddyTotal = Number(upstreams?.total || 0)
+    const caddyHealthy = Number(upstreams?.healthy || 0)
     const caddyCoverage = caddyTotal > 0 ? (caddyHealthy / caddyTotal) * 100 : null
     const sidecarUp = Object.values(sidecars).filter((s) => s?.available).length
     const sidecarTotal = Object.keys(sidecars).length
     const sidecarCoverage = sidecarTotal > 0 ? (sidecarUp / sidecarTotal) * 100 : null
 
-    const cards = [
+    const cards: CardItem[] = [
       {
         key: 'cpu',
         title: 'HOST CPU',
-        value: formatPercent(hostOs?.cpu?.usage_percent, 1),
-        hint: `load1 ${formatNumber(hostOs?.cpu?.load?.load_1m, 2)} | cores ${formatNumber(hostOs?.cpu?.cores, 0)}`,
-        status: thresholdStatus(hostOs?.cpu?.usage_percent, 70, 90),
-        progressPercent: hostOs?.cpu?.usage_percent,
+        value: formatPercent(cpu?.usage_percent, 1),
+        hint: `load1 ${formatNumber(cpuLoad?.load_1m, 2)} | cores ${formatNumber(cpu?.cores, 0)}`,
+        status: thresholdStatus(cpu?.usage_percent, 70, 90),
+        progressPercent: cpu?.usage_percent as number | null | undefined,
         trendKey: 'host_cpu',
       },
       {
         key: 'memory',
         title: 'HOST MEMORY',
-        value: formatPercent(hostOs?.memory?.used_percent, 1),
-        hint: `${formatBytes(hostOs?.memory?.used_bytes)} / ${formatBytes(hostOs?.memory?.total_bytes)}`,
-        status: thresholdStatus(hostOs?.memory?.used_percent, 75, 90),
-        progressPercent: hostOs?.memory?.used_percent,
+        value: formatPercent(mem?.used_percent, 1),
+        hint: `${formatBytes(mem?.used_bytes)} / ${formatBytes(mem?.total_bytes)}`,
+        status: thresholdStatus(mem?.used_percent, 75, 90),
+        progressPercent: mem?.used_percent as number | null | undefined,
         trendKey: 'host_mem',
       },
       {
         key: 'swap',
         title: 'HOST SWAP',
-        value: formatPercent(hostOs?.memory?.swap_used_percent, 1),
-        hint: `${formatBytes(hostOs?.memory?.swap_used_bytes)} / ${formatBytes(hostOs?.memory?.swap_total_bytes)}`,
-        status: thresholdStatus(hostOs?.memory?.swap_used_percent, 60, 85),
-        progressPercent: hostOs?.memory?.swap_used_percent,
+        value: formatPercent(mem?.swap_used_percent, 1),
+        hint: `${formatBytes(mem?.swap_used_bytes)} / ${formatBytes(mem?.swap_total_bytes)}`,
+        status: thresholdStatus(mem?.swap_used_percent, 60, 85),
+        progressPercent: mem?.swap_used_percent as number | null | undefined,
       },
       {
         key: 'disk',
         title: 'ROOT DISK',
-        value: formatPercent(hostOs?.disk?.root?.usage_percent, 1),
-        hint: `${formatBytes(hostOs?.disk?.root?.used_bytes)} used`,
-        status: thresholdStatus(hostOs?.disk?.root?.usage_percent, 80, 92),
-        progressPercent: hostOs?.disk?.root?.usage_percent,
+        value: formatPercent(disk?.usage_percent, 1),
+        hint: `${formatBytes(disk?.used_bytes)} used`,
+        status: thresholdStatus(disk?.usage_percent, 80, 92),
+        progressPercent: disk?.usage_percent as number | null | undefined,
         trendKey: 'host_disk',
       },
       {
@@ -275,24 +302,25 @@ function Metrics() {
         value: formatPercent(process?.fd_usage_percent, 1),
         hint: `${formatNumber(process?.open_fds, 0)} / ${formatNumber(process?.max_fds, 0)}`,
         status: thresholdStatus(process?.fd_usage_percent, 60, 85),
-        progressPercent: process?.fd_usage_percent,
+        progressPercent: process?.fd_usage_percent as number | null | undefined,
         trendKey: 'fd_usage',
       },
       {
         key: 'go-runtime',
         title: 'GO GOROUTINES',
         value: formatNumber(go?.goroutines, 0),
-        hint: `threads ${formatNumber(go?.threads, 0)} | gc p75 ${formatNumber(go?.gc_pause_seconds?.p75, 4)}s`,
+        hint: `threads ${formatNumber(go?.threads, 0)} | gc p75 ${formatNumber((go?.gc_pause_seconds as ApiData)?.p75, 4)}s`,
         status: thresholdStatus(go?.goroutines, 200, 600),
       },
       {
         key: 'service-uptime',
         title: 'SERVICE UPTIME',
         value: `${formatNumber(Number(backend?.uptime_seconds || 0) / 3600, 1)}h`,
-        hint: `${env?.app?.version || '-'} @ ${env?.host?.hostname || '-'}`,
+        hint: `${(env?.app as ApiData)?.version || '-'} @ ${(env?.host as ApiData)?.hostname || '-'}`,
         status: thresholdMinStatus(backend?.uptime_seconds, 600, 3600),
       },
     ]
+
     if (loading) {
       cards.unshift({
         key: 'state-loading',
@@ -316,19 +344,19 @@ function Metrics() {
     }
 
     return cards
-  }, [availableProbes, backend, caddy, env?.app?.version, env?.host?.hostname, error, go?.gc_pause_seconds?.p75, go?.goroutines, go?.threads, hostOs?.cpu?.cores, hostOs?.cpu?.load?.load_1m, hostOs?.cpu?.usage_percent, hostOs?.disk?.root?.usage_percent, hostOs?.disk?.root?.used_bytes, hostOs?.memory?.swap_total_bytes, hostOs?.memory?.swap_used_bytes, hostOs?.memory?.swap_used_percent, hostOs?.memory?.total_bytes, hostOs?.memory?.used_bytes, hostOs?.memory?.used_percent, loading, probeCoverage, process?.fd_usage_percent, process?.max_fds, process?.open_fds, sidecars, sourceProbes.length, summary.metric_names, summary.parsed_lines, summary.series, wireguard?.configured_peers, wireguard?.connected_peers, wireguard?.interface, wireguard?.is_up])
+  }, [availableProbes, backend, caddy, cpu, cpuLoad, disk, env, error, go, heap, loading, mem, probeCoverage, process, sidecars, sourceProbes.length, summary, trendHistory, upstreams, wireguard])
 
-  const probeCards = useMemo(() => sourceProbes.map((probe) => ({
-    key: `probe-${probe.id}`,
+  const probeCards = useMemo<CardItem[]>(() => sourceProbes.map((probe) => ({
+    key: `probe-${probe.id as string}`,
     title: `SOURCE ${String(probe.id).toUpperCase()}`,
     value: probe.available ? 'UP' : 'DOWN',
-    hint: `${probe.mode || 'http'} | status ${probe.status_code || '-'} | ${probe.error || 'ok'}`,
+    hint: `${(probe.mode as string) || 'http'} | status ${(probe.status_code as number | null) ?? '-'} | ${(probe.error as string) || 'ok'}`,
     status: probe.available ? 'green' : 'red',
     progressPercent: probe.available ? 100 : 0,
-    importance: probe.url,
+    importance: probe.url as string,
   })), [sourceProbes])
 
-  const sidecarCards = useMemo(() => Object.entries(sidecars).map(([name, payload]) => {
+  const sidecarCards = useMemo<CardItem[]>(() => Object.entries(sidecars).map(([name, payload]) => {
     const keyMetric = payload?.status
       || payload?.version
       || payload?.up
@@ -345,18 +373,18 @@ function Metrics() {
       hint: `metric ${String(keyMetric)} | cache ${formatNumber(payload?.cache_age_seconds, 1)}s/${formatNumber(payload?.cache_ttl_seconds, 1)}s`,
       status: payload?.available ? 'green' : 'red',
       progressPercent: payload?.available ? 100 : 0,
-      importance: `cache ${payload?.cache_state || '-'}`,
+      importance: `cache ${String(payload?.cache_state || '-')}`,
     }
   }), [sidecars])
 
-  const wireguardCards = useMemo(() => {
+  const wireguardCards = useMemo<CardItem[]>(() => {
     const wg = wireguard || {}
-    const cards = [
+    return [
       {
         key: 'wg-interface',
         title: 'WG INTERFACE',
-        value: wg?.interface || '-',
-        hint: `listen ${formatNumber(wg?.listen_port, 0)} | key ${wg?.public_key || '-'}`,
+        value: (wg?.interface as string) || '-',
+        hint: `listen ${formatNumber(wg?.listen_port, 0)} | key ${(wg?.public_key as string) || '-'}`,
         status: wg?.is_up ? 'green' : 'red',
       },
       {
@@ -371,34 +399,33 @@ function Metrics() {
         key: 'wg-transfer-rx',
         title: 'WG TRANSFER RX',
         value: formatBytes(wg?.transfer_rx),
-        hint: `session cumulative receive`,
+        hint: 'session cumulative receive',
         status: wg?.is_up ? 'green' : 'amber',
       },
       {
         key: 'wg-transfer-tx',
         title: 'WG TRANSFER TX',
         value: formatBytes(wg?.transfer_tx),
-        hint: `session cumulative transmit`,
+        hint: 'session cumulative transmit',
         status: wg?.is_up ? 'green' : 'amber',
       },
     ]
-    return cards
-  }, [wireguard])
+  }, [wireguard, trendHistory])
 
-  const infraCards = useMemo(() => {
-    const app = env?.app || {}
-    const host = env?.host || {}
-    const container = env?.container || {}
-    const db = env?.database || {}
-    const osNet = hostOs?.network || {}
-    const heap = go?.heap || {}
+  const infraCards = useMemo<CardItem[]>(() => {
+    const app = (env?.app as ApiData) || {}
+    const host = (env?.host as ApiData) || {}
+    const container = (env?.container as ApiData) || {}
+    const db = (env?.database as ApiData) || {}
+    const osNet = (hostOs?.network as ApiData) || {}
+    const gcPause = (go?.gc_pause_seconds as ApiData) || {}
 
     return [
       {
         key: 'app-version',
         title: 'APP VERSION',
-        value: app?.version || '-',
-        hint: `commit ${app?.commit || '-'} | pid ${formatNumber(app?.pid, 0)}`,
+        value: (app?.version as string) || '-',
+        hint: `commit ${(app?.commit as string) || '-'} | pid ${formatNumber(app?.pid, 0)}`,
         status: 'green',
       },
       {
@@ -411,14 +438,14 @@ function Metrics() {
       {
         key: 'host-id',
         title: 'HOST IDENTITY',
-        value: host?.hostname || '-',
-        hint: `${host?.platform || '-'} ${host?.kernel || '-'} | py ${host?.python_version || '-'}`,
+        value: (host?.hostname as string) || '-',
+        hint: `${(host?.platform as string) || '-'} ${(host?.kernel as string) || '-'} | py ${(host?.python_version as string) || '-'}`,
         status: 'green',
       },
       {
         key: 'container-mode',
         title: 'CONTAINER RUNTIME',
-        value: container?.runtime || 'host',
+        value: (container?.runtime as string) || 'host',
         hint: `containerized ${container?.is_containerized ? 'yes' : 'no'} | cgroup v${formatNumber(container?.cgroup_version, 0)}`,
         status: container?.is_containerized ? 'green' : 'amber',
       },
@@ -432,8 +459,8 @@ function Metrics() {
       {
         key: 'database-context',
         title: 'DATABASE CONTEXT',
-        value: db?.engine || '-',
-        hint: `${db?.target || '-'} | size ${formatBytes(db?.size_bytes)}`,
+        value: (db?.engine as string) || '-',
+        hint: `${(db?.target as string) || '-'} | size ${formatBytes(db?.size_bytes)}`,
         status: db?.engine ? 'green' : 'amber',
       },
       {
@@ -448,7 +475,7 @@ function Metrics() {
         key: 'host-network',
         title: 'HOST NET TOTALS',
         value: `${formatBytes(osNet?.rx_bytes_total)} rx`,
-        hint: `${formatBytes(osNet?.tx_bytes_total)} tx | ifaces ${formatNumber((osNet?.interfaces || []).length, 0)} | ${deltaLabel('host_net_rx', 0, 'B')}`,
+        hint: `${formatBytes(osNet?.tx_bytes_total)} tx | ifaces ${formatNumber((osNet?.interfaces as unknown[])?.length, 0)} | ${deltaLabel('host_net_rx', 0, 'B')}`,
         status: 'green',
         trendKey: 'host_net_rx',
       },
@@ -471,7 +498,7 @@ function Metrics() {
         key: 'go-gc-age',
         title: 'GO LAST GC AGE',
         value: `${formatNumber(go?.last_gc_age_seconds, 1)}s`,
-        hint: `next gc ${formatBytes(go?.next_gc_bytes)} | p50 ${formatNumber(go?.gc_pause_seconds?.p50, 4)}s | ${deltaLabel('go_gc_age', 1, 's')}`,
+        hint: `next gc ${formatBytes(go?.next_gc_bytes)} | p50 ${formatNumber(gcPause?.p50, 4)}s | ${deltaLabel('go_gc_age', 1, 's')}`,
         status: thresholdStatus(go?.last_gc_age_seconds, 30, 120),
         trendKey: 'go_gc_age',
       },
@@ -484,20 +511,9 @@ function Metrics() {
         trendKey: 'trivy_db_age_h',
       },
     ]
-  }, [caddy?.config_last_reload_age_seconds, caddy?.config_last_reload_successful, caddy?.config_last_reload_timestamp_seconds, data?.generated_at, env?.app, env?.container, env?.database, env?.host, go?.gc_pause_seconds?.p50, go?.heap, go?.last_gc_age_seconds, go?.next_gc_bytes, hostOs?.network, process?.cpu_seconds_total, process?.network_receive_bytes_total, process?.network_transmit_bytes_total, sidecars?.trivy_server?.db_age_hours, sidecars?.trivy_server?.db_updated_at, trendHistory])
+  }, [caddy, data, env, go, heap, hostOs, process, sidecars, trendHistory])
 
-  const runtimeCardKeys = [
-    'cpu',
-    'memory',
-    'swap',
-    'disk',
-    'api-errors',
-    'api-latency-p95',
-    'api-latency-avg',
-    'service-uptime',
-    'source-coverage',
-    'catalog-depth',
-  ]
+  const runtimeCardKeys = ['cpu', 'memory', 'swap', 'disk', 'api-errors', 'api-latency-p95', 'api-latency-avg', 'service-uptime', 'source-coverage', 'catalog-depth']
   const processCardKeys = ['process-fd', 'go-runtime', 'upstreams', 'sidecar-health']
 
   const runtimeCards = primaryCards.filter((card) => runtimeCardKeys.includes(card.key) || card.key === 'state-loading' || card.key === 'state-error')
@@ -506,7 +522,12 @@ function Metrics() {
   return (
     <Box>
       <DenseGrid>
-        <DenseSection title="Runtime Vitals" subtitle={`high-signal system and API card matrix | refresh ${data?.generated_at ? new Date(data.generated_at).toLocaleTimeString() : '-'}`} colSpan={2} rowSpan={1}>
+        <DenseSection
+          title="Runtime Vitals"
+          subtitle={`high-signal system and API card matrix | refresh ${data?.generated_at ? new Date(data.generated_at as string).toLocaleTimeString() : '-'}`}
+          colSpan={2}
+          rowSpan={1}
+        >
           <DenseCards>
             {runtimeCards.map((card) => (
               <DenseMetricCard
@@ -516,8 +537,8 @@ function Metrics() {
                 hint={card.hint}
                 status={card.status}
                 importance={card.importance}
-                progressPercent={card.progressPercent}
-                trendValues={trendHistory[card.trendKey]}
+                progressPercent={card.progressPercent ?? undefined}
+                trendValues={card.trendKey ? trendHistory[card.trendKey] : undefined}
               />
             ))}
           </DenseCards>
@@ -533,8 +554,8 @@ function Metrics() {
                 hint={card.hint}
                 status={card.status}
                 importance={card.importance}
-                progressPercent={card.progressPercent}
-                trendValues={trendHistory[card.trendKey]}
+                progressPercent={card.progressPercent ?? undefined}
+                trendValues={card.trendKey ? trendHistory[card.trendKey] : undefined}
               />
             ))}
           </DenseCards>
@@ -550,8 +571,8 @@ function Metrics() {
                 hint={card.hint}
                 status={card.status}
                 importance={card.importance}
-                progressPercent={card.progressPercent}
-                trendValues={trendHistory[card.trendKey]}
+                progressPercent={card.progressPercent ?? undefined}
+                trendValues={card.trendKey ? trendHistory[card.trendKey] : undefined}
               />
             ))}
           </DenseCards>
@@ -567,7 +588,7 @@ function Metrics() {
                 hint={card.hint}
                 status={card.status}
                 importance={card.importance}
-                progressPercent={card.progressPercent}
+                progressPercent={card.progressPercent ?? undefined}
               />
             ))}
           </DenseCards>
@@ -583,7 +604,7 @@ function Metrics() {
                 hint={card.hint}
                 status={card.status}
                 importance={card.importance}
-                progressPercent={card.progressPercent}
+                progressPercent={card.progressPercent ?? undefined}
               />
             ))}
           </DenseCards>
@@ -599,8 +620,8 @@ function Metrics() {
                 hint={card.hint}
                 status={card.status}
                 importance={card.importance}
-                progressPercent={card.progressPercent}
-                trendValues={trendHistory[card.trendKey]}
+                progressPercent={card.progressPercent ?? undefined}
+                trendValues={card.trendKey ? trendHistory[card.trendKey] : undefined}
               />
             ))}
           </DenseCards>

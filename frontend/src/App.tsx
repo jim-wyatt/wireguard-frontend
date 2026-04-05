@@ -22,7 +22,7 @@ function PageLoader() {
   )
 }
 
-function RequireAuth({ children }) {
+function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
   const location = useLocation()
 
@@ -30,7 +30,7 @@ function RequireAuth({ children }) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
 
-  return children
+  return <>{children}</>
 }
 
 function App() {
@@ -49,7 +49,7 @@ function App() {
           <Login />
         </Suspense>
       } />
-      
+
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route path="/dashboard" element={
           <Suspense fallback={<PageLoader />}>

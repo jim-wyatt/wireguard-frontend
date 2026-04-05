@@ -3,6 +3,16 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Alert, Box, Button, Stack, TextField, Typography } from '@mui/material'
 import { useAuth } from '../context/AuthContext'
 import { DenseCards, DenseGrid, DenseMetricCard, DenseSection } from '../components/dense/CyberUi'
+import type { RagStatus } from '../components/dense/CyberUi'
+
+interface CardItem {
+  key: string
+  title: string
+  value: string
+  hint: string
+  status: RagStatus
+  importance: string
+}
 
 function Login() {
   const navigate = useNavigate()
@@ -12,7 +22,7 @@ function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const targetPath = location.state?.from || '/dashboard'
+  const targetPath = (location.state as { from?: string })?.from || '/dashboard'
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -51,13 +61,14 @@ function Login() {
 
       login(token.trim())
       navigate(targetPath, { replace: true })
-    } catch (err) {
-      setError(`Connection error: ${err.message}`)
+    } catch (err: unknown) {
+      const e = err as { message?: string }
+      setError(`Connection error: ${e.message}`)
       setLoading(false)
     }
   }
 
-  const infoCards = useMemo(() => [
+  const infoCards = useMemo<CardItem[]>(() => [
     {
       key: 'auth-model',
       title: 'ACCESS MODEL',
@@ -98,63 +109,34 @@ function Login() {
     <Box sx={{ px: 1.5, pt: 1.5, pb: 3, minHeight: '100vh' }}>
       <DenseGrid>
         <DenseSection title="Credential Gate" subtitle="authenticate to enter NEXUS operator console" colSpan={2} rowSpan={3}>
-          <DenseCards>
-            <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
-              <Stack spacing={1.2}>
-                <Typography variant="subtitle2" sx={{ letterSpacing: 0.6 }}>ENTER ACCESS TOKEN</Typography>
-                <TextField
-                  size="small"
-                  fullWidth
-                  type="password"
-                  label="Bearer Token"
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !loading) {
-                      e.preventDefault()
-                      validateAndLogin()
-                    }
-                  }}
-                />
-                {error ? <Alert severity="error">{error}</Alert> : null}
-                <Stack direction="row" spacing={1}>
-                  <Button variant="contained" onClick={validateAndLogin} disabled={loading || !token.trim()}>
-                    {loading ? 'Validating...' : 'Validate And Enter'}
-                  </Button>
-                  <Button variant="outlined" onClick={() => setToken('')} disabled={loading || !token}>
-                    Clear
-                  </Button>
-                </Stack>
-              </Stack>
-            </Box>
-
-            <DenseMetricCard
-              title="TOKEN SNAPSHOT"
-              value={tokenSummary}
-              hint="preview is masked for safety"
-              status={token ? 'green' : 'amber'}
-              importance="Quick confidence check before submitting credentials."
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            {error && <Alert severity="error">{error}</Alert>}
+            <TextField
+              label="API Token"
+              type="password"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && validateAndLogin()}
+              fullWidth
+              autoFocus
+              size="small"
             />
-            <DenseMetricCard
-              title="ENTRY TARGET"
-              value={targetPath}
-              hint="redirect destination after successful auth"
-              status="green"
-              importance="Returns operator to the originally requested route."
-            />
-            <DenseMetricCard
-              title="AUTH STATE"
-              value={loading ? 'VALIDATING' : error ? 'REJECTED' : token ? 'READY' : 'IDLE'}
-              hint={loading ? 'verifying token against protected endpoint' : error || 'provide token and submit'}
-              status={loading ? 'amber' : error ? 'red' : token ? 'green' : 'amber'}
-              importance="Clear state transitions for a predictable login experience."
-            />
-          </DenseCards>
+            <Typography variant="caption" color="text.secondary">
+              preview: {tokenSummary}
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={validateAndLogin}
+              disabled={loading || !token.trim()}
+              fullWidth
+            >
+              {loading ? 'Verifying...' : 'Authenticate'}
+            </Button>
+          </Stack>
         </DenseSection>
 
-        <DenseSection title="Operator Notes" subtitle="login behavior and security intent" colSpan={1} rowSpan={3}>
-          <DenseCards>
+        <DenseSection title="Auth Context" subtitle="session model and scope" colSpan={1} rowSpan={3}>
+          <DenseCards cols={1}>
             {infoCards.map((card) => (
               <DenseMetricCard
                 key={card.key}

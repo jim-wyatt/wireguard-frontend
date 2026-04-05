@@ -115,6 +115,37 @@ def _ansi_to_static_screen(ansi_text: str) -> str:
 # Endpoint
 # ---------------------------------------------------------------------------
 
+def _run_top() -> str:
+    """Run ``top -b -n 1`` and return its plain-text output."""
+    try:
+        result = subprocess.run(
+            ["top", "-b", "-n", "1"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        return result.stdout or result.stderr or "top produced no output"
+    except FileNotFoundError:
+        return "top not found in PATH"
+    except subprocess.TimeoutExpired:
+        return "top timed out"
+    except Exception as exc:  # noqa: BLE001
+        return f"top failed: {exc}"
+
+
+@router.get("/debug/top/snapshot", dependencies=[Depends(require_api_auth)])
+async def top_snapshot() -> dict:
+    loop = asyncio.get_running_loop()
+    text = await loop.run_in_executor(None, _run_top)
+    lines = text.splitlines()
+    return {
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "snapshot_text": text,
+        "snapshot_lines": lines,
+        "line_count": len(lines),
+    }
+
+
 @router.get("/debug/btop/snapshot", dependencies=[Depends(require_api_auth)])
 async def system_snapshot() -> dict:
     loop = asyncio.get_running_loop()

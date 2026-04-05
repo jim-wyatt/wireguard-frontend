@@ -10,11 +10,17 @@ import {
 } from '@mui/material'
 import { clientsApi } from '../services/api'
 
-function CreateNodeDialog({ open, onClose, onSuccess }) {
+interface CreateNodeDialogProps {
+  open: boolean
+  onClose: () => void
+  onSuccess: () => void
+}
+
+function CreateNodeDialog({ open, onClose, onSuccess }: CreateNodeDialogProps) {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) {
@@ -24,7 +30,7 @@ function CreateNodeDialog({ open, onClose, onSuccess }) {
     }
   }, [open])
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
@@ -33,8 +39,9 @@ function CreateNodeDialog({ open, onClose, onSuccess }) {
       await clientsApi.createClient({ email, name: name || undefined })
       onSuccess()
       onClose()
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create node')
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { detail?: string } } }
+      setError(axiosErr.response?.data?.detail || 'Failed to create node')
     } finally {
       setLoading(false)
     }

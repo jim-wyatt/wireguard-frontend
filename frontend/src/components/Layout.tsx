@@ -28,15 +28,21 @@ import LightModeIcon from '@mui/icons-material/LightMode'
 import { useAuth } from '../context/AuthContext'
 import { useUi } from '../context/UiContext'
 
+interface NavItem {
+  text: string
+  icon: React.ReactNode
+  path: string
+}
+
 function Layout() {
-  const [menuAnchor, setMenuAnchor] = useState(null)
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null)
   const [dockVisible, setDockVisible] = useState(true)
   const navigate = useNavigate()
   const location = useLocation()
   const { isAuthenticated, logout } = useAuth()
   const { matrixMode, toggleMatrixMode } = useUi()
 
-  const navItems = [
+  const navItems: NavItem[] = [
     { text: 'Dash', icon: <DashboardIcon fontSize="small" />, path: '/dashboard' },
     { text: 'Nodes', icon: <PeopleIcon fontSize="small" />, path: '/nodes' },
     { text: 'Logs', icon: <ReceiptLongIcon fontSize="small" />, path: '/logs' },
@@ -47,7 +53,7 @@ function Layout() {
   ]
 
   useEffect(() => {
-    const navHotkeys = {
+    const navHotkeys: Record<string, string> = {
       '1': '/dashboard',
       '2': '/nodes',
       '3': '/logs',
@@ -57,9 +63,9 @@ function Layout() {
       '7': '/debug',
     }
 
-    const onKeydown = (event) => {
+    const onKeydown = (event: KeyboardEvent) => {
       if (event.ctrlKey || event.metaKey || event.altKey) return
-      const target = event.target
+      const target = event.target as HTMLElement | null
       const tag = target?.tagName?.toLowerCase()
       if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) return
 
@@ -81,7 +87,6 @@ function Layout() {
       const currentY = window.scrollY
       const delta = currentY - lastY
 
-      // Keep dock visible near top; otherwise hide on downward scroll and show on upward scroll.
       if (currentY < 48) {
         setDockVisible(true)
       } else if (delta > 6) {

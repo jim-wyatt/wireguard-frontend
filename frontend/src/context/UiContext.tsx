@@ -1,19 +1,26 @@
-import { createContext, useContext, useMemo, useState } from 'react'
+import { createContext, useContext, useMemo, useState, ReactNode } from 'react'
 
-const UiContext = createContext()
+interface UiContextValue {
+  matrixMode: boolean
+  sidebarVisible: boolean
+  toggleMatrixMode: () => void
+  toggleSidebarVisible: () => void
+}
+
+const UiContext = createContext<UiContextValue | undefined>(undefined)
 
 const MATRIX_MODE_KEY = 'uiMatrixMode'
 const SIDEBAR_VISIBLE_KEY = 'uiSidebarVisible'
 
-function readBool(key, fallback) {
+function readBool(key: string, fallback: boolean): boolean {
   const value = window.localStorage.getItem(key)
   if (value === null) return fallback
   return value === 'true'
 }
 
-export function UiProvider({ children }) {
-  const [matrixMode, setMatrixMode] = useState(() => readBool(MATRIX_MODE_KEY, true))
-  const [sidebarVisible, setSidebarVisible] = useState(() => readBool(SIDEBAR_VISIBLE_KEY, true))
+export function UiProvider({ children }: { children: ReactNode }) {
+  const [matrixMode, setMatrixMode] = useState<boolean>(() => readBool(MATRIX_MODE_KEY, true))
+  const [sidebarVisible, setSidebarVisible] = useState<boolean>(() => readBool(SIDEBAR_VISIBLE_KEY, true))
 
   const toggleMatrixMode = () => {
     setMatrixMode((prev) => {
@@ -31,7 +38,7 @@ export function UiProvider({ children }) {
     })
   }
 
-  const value = useMemo(() => ({
+  const value = useMemo<UiContextValue>(() => ({
     matrixMode,
     sidebarVisible,
     toggleMatrixMode,
@@ -45,7 +52,7 @@ export function UiProvider({ children }) {
   )
 }
 
-export function useUi() {
+export function useUi(): UiContextValue {
   const context = useContext(UiContext)
   if (!context) {
     throw new Error('useUi must be used within UiProvider')
