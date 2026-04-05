@@ -117,9 +117,10 @@ function Layout() {
         <Toolbar variant="dense" sx={{ minHeight: '42px !important' }}>
           <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexGrow: 1 }}>
             <VpnKeyIcon sx={{ fontSize: 18 }} />
-            <Typography variant="subtitle2">TRUSTED EXCHANGE HUB OPS HUD</Typography>
-            <Typography variant="caption" color="text.secondary">| HOTKEYS 1-7</Typography>
-            <Typography variant="caption" color="text.secondary">| PAGE {location.pathname}</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 1 }}>NEXUS</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.62rem' }}>// TRUSTED NODE EXCHANGE HUB</Typography>
+            <Typography variant="caption" color="text.secondary">| 1-7</Typography>
+            <Typography variant="caption" color="text.secondary">| {location.pathname}</Typography>
           </Stack>
 
           <Tooltip title={matrixMode ? 'switch light mode' : 'switch matrix mode'}>
@@ -136,7 +137,7 @@ function Layout() {
               <MenuItem onClick={() => {
                 setMenuAnchor(null)
                 logout()
-                navigate('/')
+                navigate('/login')
               }}>
                 <LogoutIcon sx={{ mr: 1 }} fontSize="small" />
                 Logout

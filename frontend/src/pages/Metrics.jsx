@@ -238,19 +238,6 @@ function Metrics() {
         trendKey: 'api_avg',
       },
       {
-        key: 'monitor-link',
-        title: 'MONITOR LINK PEERS',
-        value: `${formatNumber(wireguard?.connected_peers, 0)}/${formatNumber(wireguard?.configured_peers, 0)}`,
-        hint: `${wireguard?.interface || '-'} | ${wireguard?.is_up ? 'up' : 'down'}`,
-        status: Number(wireguard?.configured_peers || 0) === 0
-          ? 'amber'
-          : thresholdMinStatus((Number(wireguard?.connected_peers || 0) / Number(wireguard?.configured_peers || 1)) * 100, 50, 100),
-        progressPercent: Number(wireguard?.configured_peers || 0) > 0
-          ? (Number(wireguard?.connected_peers || 0) / Number(wireguard?.configured_peers || 1)) * 100
-          : undefined,
-        trendKey: 'wg_peer_ratio',
-      },
-      {
         key: 'source-coverage',
         title: 'SOURCE COVERAGE',
         value: `${availableProbes}/${sourceProbes.length}`,
@@ -499,12 +486,29 @@ function Metrics() {
     ]
   }, [caddy?.config_last_reload_age_seconds, caddy?.config_last_reload_successful, caddy?.config_last_reload_timestamp_seconds, data?.generated_at, env?.app, env?.container, env?.database, env?.host, go?.gc_pause_seconds?.p50, go?.heap, go?.last_gc_age_seconds, go?.next_gc_bytes, hostOs?.network, process?.cpu_seconds_total, process?.network_receive_bytes_total, process?.network_transmit_bytes_total, sidecars?.trivy_server?.db_age_hours, sidecars?.trivy_server?.db_updated_at, trendHistory])
 
+  const runtimeCardKeys = [
+    'cpu',
+    'memory',
+    'swap',
+    'disk',
+    'api-errors',
+    'api-latency-p95',
+    'api-latency-avg',
+    'service-uptime',
+    'source-coverage',
+    'catalog-depth',
+  ]
+  const processCardKeys = ['process-fd', 'go-runtime', 'upstreams', 'sidecar-health']
+
+  const runtimeCards = primaryCards.filter((card) => runtimeCardKeys.includes(card.key) || card.key === 'state-loading' || card.key === 'state-error')
+  const processCards = primaryCards.filter((card) => processCardKeys.includes(card.key))
+
   return (
     <Box>
       <DenseGrid>
-        <DenseSection title="Runtime Vitals" subtitle={`high-signal system and API card matrix | refresh ${data?.generated_at ? new Date(data.generated_at).toLocaleTimeString() : '-'}`} colSpan={3} rowSpan={1}>
+        <DenseSection title="Runtime Vitals" subtitle={`high-signal system and API card matrix | refresh ${data?.generated_at ? new Date(data.generated_at).toLocaleTimeString() : '-'}`} colSpan={2} rowSpan={1}>
           <DenseCards>
-            {primaryCards.map((card) => (
+            {runtimeCards.map((card) => (
               <DenseMetricCard
                 key={card.key}
                 title={card.title}
@@ -519,7 +523,57 @@ function Metrics() {
           </DenseCards>
         </DenseSection>
 
-        <DenseSection title="Probe Cards" subtitle="endpoint-level probe measurements" colSpan={3} rowSpan={1}>
+        <DenseSection title="Process + Network" subtitle="fd pressure, go runtime, and edge continuity" colSpan={1} rowSpan={1}>
+          <DenseCards>
+            {processCards.map((card) => (
+              <DenseMetricCard
+                key={card.key}
+                title={card.title}
+                value={card.value}
+                hint={card.hint}
+                status={card.status}
+                importance={card.importance}
+                progressPercent={card.progressPercent}
+                trendValues={trendHistory[card.trendKey]}
+              />
+            ))}
+          </DenseCards>
+        </DenseSection>
+
+        <DenseSection title="WireGuard Session Signals" subtitle="tunnel timing and transfer coverage with timestamps" colSpan={1} rowSpan={1}>
+          <DenseCards>
+            {wireguardCards.map((card) => (
+              <DenseMetricCard
+                key={card.key}
+                title={card.title}
+                value={card.value}
+                hint={card.hint}
+                status={card.status}
+                importance={card.importance}
+                progressPercent={card.progressPercent}
+                trendValues={trendHistory[card.trendKey]}
+              />
+            ))}
+          </DenseCards>
+        </DenseSection>
+
+        <DenseSection title="App + Environment Coverage" subtitle="application, container, database, caddy and host/process network context" colSpan={2} rowSpan={1}>
+          <DenseCards>
+            {infraCards.map((card) => (
+              <DenseMetricCard
+                key={card.key}
+                title={card.title}
+                value={card.value}
+                hint={card.hint}
+                status={card.status}
+                importance={card.importance}
+                progressPercent={card.progressPercent}
+              />
+            ))}
+          </DenseCards>
+        </DenseSection>
+
+        <DenseSection title="Source Probes" subtitle="endpoint-level probe measurements" colSpan={3} rowSpan={1}>
           <DenseCards>
             {probeCards.map((card) => (
               <DenseMetricCard
@@ -530,13 +584,12 @@ function Metrics() {
                 status={card.status}
                 importance={card.importance}
                 progressPercent={card.progressPercent}
-                trendValues={trendHistory[card.trendKey]}
               />
             ))}
           </DenseCards>
         </DenseSection>
 
-        <DenseSection title="Sidecar Cards" subtitle="per-sidecar metrics with cache freshness" colSpan={3} rowSpan={1}>
+        <DenseSection title="Sidecar Fleet" subtitle="per-sidecar metrics with cache freshness" colSpan={3} rowSpan={1}>
           <DenseCards>
             {sidecarCards.map((card) => (
               <DenseMetricCard
@@ -548,38 +601,6 @@ function Metrics() {
                 importance={card.importance}
                 progressPercent={card.progressPercent}
                 trendValues={trendHistory[card.trendKey]}
-              />
-            ))}
-          </DenseCards>
-        </DenseSection>
-
-        <DenseSection title="WireGuard Session Signals" subtitle="tunnel timing and transfer coverage with timestamps" colSpan={3} rowSpan={1}>
-          <DenseCards>
-            {wireguardCards.map((card) => (
-              <DenseMetricCard
-                key={card.key}
-                title={card.title}
-                value={card.value}
-                hint={card.hint}
-                status={card.status}
-                importance={card.importance}
-                progressPercent={card.progressPercent}
-              />
-            ))}
-          </DenseCards>
-        </DenseSection>
-
-        <DenseSection title="App + Environment Coverage" subtitle="application, container, database, caddy and host/process network context" colSpan={3} rowSpan={1}>
-          <DenseCards>
-            {infraCards.map((card) => (
-              <DenseMetricCard
-                key={card.key}
-                title={card.title}
-                value={card.value}
-                hint={card.hint}
-                status={card.status}
-                importance={card.importance}
-                progressPercent={card.progressPercent}
               />
             ))}
           </DenseCards>

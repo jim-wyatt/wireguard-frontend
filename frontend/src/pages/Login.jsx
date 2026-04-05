@@ -1,26 +1,24 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Box } from '@mui/material'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { Alert, Box, Button, Stack, TextField, Typography } from '@mui/material'
 import { useAuth } from '../context/AuthContext'
 import { DenseCards, DenseGrid, DenseMetricCard, DenseSection } from '../components/dense/CyberUi'
 
 function Login() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const location = useLocation()
+  const { login, isAuthenticated } = useAuth()
   const [token, setToken] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const maskedToken = token
-    ? `${token.slice(0, 6)}...${token.slice(-4)}`
-    : 'not set'
+  const targetPath = location.state?.from || '/dashboard'
 
-  const openTokenPrompt = () => {
-    const entered = window.prompt('Paste API token')
-    if (entered === null) return
-    setToken(String(entered).trim())
-    setError('')
-  }
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(targetPath, { replace: true })
+    }
+  }, [isAuthenticated, navigate, targetPath])
 
   const validateAndLogin = async () => {
     setError('')
@@ -33,9 +31,9 @@ function Login() {
         return
       }
 
-      const response = await fetch('/api/clients?limit=1', {
+      const response = await fetch('/api/nodes?limit=1', {
         headers: {
-          'Authorization': `Bearer ${token.trim()}`,
+          Authorization: `Bearer ${token.trim()}`,
         },
       })
 
@@ -45,120 +43,117 @@ function Login() {
         } else if (response.status === 429) {
           setError('Too many failed login attempts. Please wait a few minutes and try again.')
         } else {
-          setError(`API Error: ${response.statusText}`)
+          setError(`API error: ${response.status} ${response.statusText}`)
         }
         setLoading(false)
         return
       }
 
       login(token.trim())
-      navigate('/dashboard')
+      navigate(targetPath, { replace: true })
     } catch (err) {
       setError(`Connection error: ${err.message}`)
       setLoading(false)
     }
   }
 
-  const infoCards = [
+  const infoCards = useMemo(() => [
     {
-      key: 'note-token',
-      title: 'TOKEN SOURCE',
-      value: 'OPERATOR/ANALYST',
-      hint: 'use a valid administrator-issued bearer token',
+      key: 'auth-model',
+      title: 'ACCESS MODEL',
+      value: 'BEARER TOKEN',
+      hint: 'paste token issued by platform operators',
       status: 'green',
-      importance: 'Identity assurance starts with controlled token distribution.',
+      importance: 'This hub requires token auth for protected routes and APIs.',
     },
     {
-      key: 'note-rate-limit',
-      title: 'LOGIN THROTTLE',
-      value: 'ACTIVE',
-      hint: 'failed attempts are rate-limited with temporary lockout',
+      key: 'auth-check',
+      title: 'VALIDATION',
+      value: 'LIVE API CHECK',
+      hint: 'token is verified against /api/nodes before session starts',
       status: 'amber',
-      importance: 'Rate controls reduce brute-force risk during credential abuse.',
+      importance: 'Prevents saving unusable credentials in browser state.',
     },
     {
-      key: 'note-storage',
-      title: 'SESSION STORAGE',
+      key: 'auth-scope',
+      title: 'SESSION SCOPE',
       value: 'LOCAL BROWSER',
-      hint: 'token persists for authorized API requests in this client',
+      hint: 'token persists until logout',
       status: 'amber',
-      importance: 'Session persistence balances usability with endpoint hygiene needs.',
+      importance: 'Use Logout after operations to clear local session context.',
     },
     {
-      key: 'note-purpose',
-      title: 'MISSION CONTEXT',
+      key: 'auth-purpose',
+      title: 'MISSION',
       value: 'TRUSTED EXCHANGE HUB',
-      hint: 'monitored, validated, and safe collaboration at connection level',
+      hint: 'controlled access to nodes, logs, trust and operations telemetry',
       status: 'green',
-      importance: 'Operational goal is secure information exchange across teams.',
+      importance: 'Authentication keeps the operator HUD trustworthy and auditable.',
     },
-  ]
+  ], [])
 
-  if (loading) {
-    infoCards.unshift({
-      key: 'auth-state-loading',
-      title: 'AUTH STATE',
-      value: 'VALIDATING',
-      hint: 'verifying token against protected endpoint',
-      status: 'amber',
-      importance: 'Authentication handshake in progress.',
-    })
-  }
-
-  if (error) {
-    infoCards.unshift({
-      key: 'auth-state-error',
-      title: 'AUTH STATE',
-      value: 'REJECTED',
-      hint: error,
-      status: 'red',
-      importance: 'Credential validation failed; operator action required.',
-    })
-  }
+  const tokenSummary = token ? `${token.slice(0, 8)}...${token.slice(-4)}` : 'No token entered'
 
   return (
     <Box sx={{ px: 1.5, pt: 1.5, pb: 3, minHeight: '100vh' }}>
       <DenseGrid>
-        <DenseSection title="Credential Gate" subtitle="supply API bearer token" colSpan={2} rowSpan={3}>
+        <DenseSection title="Credential Gate" subtitle="authenticate to enter NEXUS operator console" colSpan={2} rowSpan={3}>
           <DenseCards>
+            <Box sx={{ p: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
+              <Stack spacing={1.2}>
+                <Typography variant="subtitle2" sx={{ letterSpacing: 0.6 }}>ENTER ACCESS TOKEN</Typography>
+                <TextField
+                  size="small"
+                  fullWidth
+                  type="password"
+                  label="Bearer Token"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !loading) {
+                      e.preventDefault()
+                      validateAndLogin()
+                    }
+                  }}
+                />
+                {error ? <Alert severity="error">{error}</Alert> : null}
+                <Stack direction="row" spacing={1}>
+                  <Button variant="contained" onClick={validateAndLogin} disabled={loading || !token.trim()}>
+                    {loading ? 'Validating...' : 'Validate And Enter'}
+                  </Button>
+                  <Button variant="outlined" onClick={() => setToken('')} disabled={loading || !token}>
+                    Clear
+                  </Button>
+                </Stack>
+              </Stack>
+            </Box>
+
             <DenseMetricCard
               title="TOKEN SNAPSHOT"
-              value={maskedToken}
-              hint="token preview is masked for operator safety"
+              value={tokenSummary}
+              hint="preview is masked for safety"
               status={token ? 'green' : 'amber'}
-              importance="Confirms whether a credential is currently staged for validation."
+              importance="Quick confidence check before submitting credentials."
             />
-            <Box onClick={openTokenPrompt} sx={{ cursor: 'pointer' }}>
-              <DenseMetricCard
-                title="CONTROL :: SET TOKEN"
-                value="EDIT"
-                hint="click to paste or replace bearer token"
-                status="amber"
-                importance="Token input remains inside card interaction to preserve uniform UI language."
-              />
-            </Box>
-            <Box onClick={() => setToken('')} sx={{ cursor: 'pointer' }}>
-              <DenseMetricCard
-                title="CONTROL :: CLEAR TOKEN"
-                value="RESET"
-                hint="click to clear staged credential"
-                status={token ? 'amber' : 'green'}
-                importance="Allows quick cleanup before screen-sharing or handoff."
-              />
-            </Box>
-            <Box onClick={validateAndLogin} sx={{ cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1 }}>
-              <DenseMetricCard
-                title="CONTROL :: VALIDATE + ENTER"
-                value={loading ? 'VALIDATING' : 'LOGIN'}
-                hint="click to verify token against protected endpoint"
-                status={loading ? 'amber' : token ? 'green' : 'amber'}
-                importance="Authentication is executed as a card action to keep page structure consistent."
-              />
-            </Box>
+            <DenseMetricCard
+              title="ENTRY TARGET"
+              value={targetPath}
+              hint="redirect destination after successful auth"
+              status="green"
+              importance="Returns operator to the originally requested route."
+            />
+            <DenseMetricCard
+              title="AUTH STATE"
+              value={loading ? 'VALIDATING' : error ? 'REJECTED' : token ? 'READY' : 'IDLE'}
+              hint={loading ? 'verifying token against protected endpoint' : error || 'provide token and submit'}
+              status={loading ? 'amber' : error ? 'red' : token ? 'green' : 'amber'}
+              importance="Clear state transitions for a predictable login experience."
+            />
           </DenseCards>
         </DenseSection>
 
-        <DenseSection title="Operator Notes" subtitle="auth guidance as datapoint cards" colSpan={1} rowSpan={3}>
+        <DenseSection title="Operator Notes" subtitle="login behavior and security intent" colSpan={1} rowSpan={3}>
           <DenseCards>
             {infoCards.map((card) => (
               <DenseMetricCard

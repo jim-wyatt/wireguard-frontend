@@ -128,15 +128,15 @@ sudo nano /etc/wireguard/wg0.conf
 ## API Endpoints
 
 - Public dashboard reads:
-	- `GET /api/clients/stats`
-	- `GET /api/clients/connected`
+	- `GET /api/nodes/stats`
+	- `GET /api/nodes/connected`
 - Writer-auth protected routes:
-	- `POST /api/clients`
-	- `GET /api/clients`
-	- `GET /api/clients/{id}`
-	- `GET /api/clients/{id}/config`
-	- `PATCH /api/clients/{id}/toggle`
-	- `DELETE /api/clients/{id}`
+	- `POST /api/nodes`
+	- `GET /api/nodes`
+	- `GET /api/nodes/{id}`
+	- `GET /api/nodes/{id}/config`
+	- `PATCH /api/nodes/{id}/toggle`
+	- `DELETE /api/nodes/{id}`
 
 ## Security Notes
 

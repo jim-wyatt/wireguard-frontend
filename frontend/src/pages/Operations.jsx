@@ -175,8 +175,10 @@ function sidecarDomainCards(name, payload) {
         key: `${name}-cache`,
         title: 'PARCA CACHE HIT',
         value: `${formatNumber(payload?.debuginfod_cache_hit_percent, 1)}%`,
-        hint: withObserved(`goroutines ${formatNumber(payload?.go_goroutines, 0)}`, payload),
-        status: thresholdMinStatus(payload?.debuginfod_cache_hit_percent, 70, 90),
+        hint: withObserved(`goroutines ${formatNumber(payload?.go_goroutines, 0)} | reqs ${formatNumber(payload?.debuginfod_cache_total, 0)}`, payload),
+        status: Number(payload?.debuginfod_cache_total ?? 0) < 10
+          ? 'amber'
+          : thresholdMinStatus(payload?.debuginfod_cache_hit_percent, 70, 90),
       },
     ]
   }
@@ -318,13 +320,6 @@ function Operations() {
     const p95 = metrics?.runtime?.backend?.p95_latency_ms
     const avg = metrics?.runtime?.backend?.avg_latency_ms
     const errRate = metrics?.runtime?.backend?.error_rate_percent
-    const uptime = metrics?.runtime?.backend?.uptime_seconds
-    const caddyHealthy = metrics?.runtime?.caddy?.reverse_proxy_upstreams?.healthy
-    const caddyTotal = metrics?.runtime?.caddy?.reverse_proxy_upstreams?.total
-    const caddyPct = Number(caddyTotal) > 0 ? (Number(caddyHealthy || 0) / Number(caddyTotal || 1)) * 100 : null
-    const hostCpu = metrics?.runtime?.os?.cpu?.usage_percent
-    const hostMem = metrics?.runtime?.os?.memory?.used_percent
-    const fdUsage = metrics?.runtime?.process?.fd_usage_percent
     const wgConfigured = metrics?.runtime?.wireguard?.configured_peers
     const wgConnected = metrics?.runtime?.wireguard?.connected_peers
     const wgPct = Number(wgConfigured) > 0 ? (Number(wgConnected || 0) / Number(wgConfigured || 1)) * 100 : null
@@ -363,14 +358,6 @@ function Operations() {
         importance: 'Tail latency predicts user-visible degradation earliest.',
       },
       {
-        key: 'api-uptime',
-        title: 'API UPTIME',
-        value: `${formatNumber(Number(uptime || 0) / 3600, 1)}h`,
-        hint: `${formatNumber(metrics?.runtime?.backend?.requests_total, 0)} requests total`,
-        status: thresholdMinStatus(uptime, 600, 3600),
-        importance: 'Sustained uptime reflects control-plane stability.',
-      },
-      {
         key: 'critical',
         title: 'CRITICAL FINDINGS',
         value: formatNumber(actionCritical, 0),
@@ -396,50 +383,6 @@ function Operations() {
         status: thresholdMinStatus(wgPct, 50, 100),
         progressPercent: wgPct,
         importance: 'Secure monitor-link status is the service-level outcome.',
-      },
-      {
-        key: 'edge-upstreams',
-        title: 'EDGE UPSTREAMS',
-        value: `${formatNumber(caddyHealthy, 0)}/${formatNumber(caddyTotal, 0)}`,
-        hint: `in-flight ${formatNumber(metrics?.runtime?.caddy?.requests_in_flight, 0)}`,
-        status: thresholdMinStatus(caddyPct, 80, 100),
-        progressPercent: caddyPct,
-        importance: 'Ingress health gates frontend and API availability.',
-      },
-      {
-        key: 'host-cpu',
-        title: 'HOST CPU',
-        value: `${formatNumber(hostCpu, 1)}%`,
-        hint: `load1 ${formatNumber(metrics?.runtime?.os?.cpu?.load?.load_1m, 2)}`,
-        status: thresholdStatus(hostCpu, 70, 90),
-        progressPercent: hostCpu,
-        importance: 'CPU pressure predicts queueing before hard failures.',
-      },
-      {
-        key: 'host-memory',
-        title: 'HOST MEMORY',
-        value: `${formatNumber(hostMem, 1)}%`,
-        hint: `${formatNumber(metrics?.runtime?.os?.memory?.used_bytes, 0)} used bytes`,
-        status: thresholdStatus(hostMem, 75, 90),
-        progressPercent: hostMem,
-        importance: 'Memory saturation increases restart and OOM risk.',
-      },
-      {
-        key: 'fd-usage',
-        title: 'FD USAGE',
-        value: `${formatNumber(fdUsage, 1)}%`,
-        hint: `${formatNumber(metrics?.runtime?.process?.open_fds, 0)} open fds`,
-        status: thresholdStatus(fdUsage, 60, 85),
-        progressPercent: fdUsage,
-        importance: 'FD exhaustion can cascade into service outages.',
-      },
-      {
-        key: 'db-age',
-        title: 'TRIVY DB AGE',
-        value: `${formatNumber(metrics?.runtime?.sidecars?.trivy_server?.db_age_hours, 1)}h`,
-        hint: `v${metrics?.runtime?.sidecars?.trivy_server?.version || '-'} vuln intelligence freshness`,
-        status: thresholdStatus(metrics?.runtime?.sidecars?.trivy_server?.db_age_hours, 24, 72),
-        importance: 'Outdated vuln DB reduces trust in attestation posture.',
       },
     ]
 
@@ -468,17 +411,90 @@ function Operations() {
     return vitals
   }, [attestation, error, loading, metrics])
 
-  const sidecarCards = Object.entries(metrics?.runtime?.sidecars || {})
-    .filter(([, payload]) => payload?.configured !== false)
-    .map(([name, payload]) => ({
-      key: `sidecar-${name}`,
-      title: `SIDECAR ${name.toUpperCase()}`,
-      value: payload?.available ? 'ONLINE' : 'OFFLINE',
-      hint: `metric ${payload?.status || payload?.version || payload?.up || payload?.go_goroutines || '-'} | api ${formatNumber(payload?.api_probe_summary?.healthy, 0)}/${formatNumber(payload?.api_probe_summary?.total, 0)}`,
-      status: payload?.available ? 'green' : 'red',
-      progressPercent: Number(payload?.api_probe_summary?.coverage_percent || 0),
-      importance: `cache ${payload?.cache_state || '-'} | mode ${payload?.mode || '-'} | api latency ${formatNumber(payload?.api_probe_summary?.avg_latency_ms, 1)} ms`,
-    }))
+  const compositeCards = useMemo(() => {
+    const topKeys = [
+      'probe-cov',
+      'sidecar-cov',
+      'latency',
+      'critical',
+      'evidence-coverage',
+      'wg',
+    ]
+    const selected = cards.filter((card) => topKeys.includes(card.key))
+    const stateCards = cards.filter((card) => card.key === 'state-loading' || card.key === 'state-error')
+    return [...stateCards, ...selected]
+  }, [cards])
+
+  const statusFlagCards = useMemo(() => {
+    const sidecars = metrics?.runtime?.sidecars || {}
+    const wgUp = Boolean(metrics?.runtime?.wireguard?.is_up)
+    const lockout = Boolean(attestation?.policy?.auth_lockout_enabled)
+    const docsLocked = !(attestation?.surface?.api_docs_enabled)
+    const rateLimits = Boolean(attestation?.policy?.rate_limit_enabled)
+    const crowdsecHealthy = String(sidecars?.crowdsec?.status || '').toLowerCase() === 'up' || Boolean(sidecars?.crowdsec?.healthy)
+    const trivyFresh = Number(sidecars?.trivy_server?.db_age_hours || 9999) <= 24
+    const parcaProfiling = Boolean(sidecars?.parca?.available)
+    const httpsActive = Boolean(attestation?.surface?.https_enabled)
+
+    return [
+      {
+        key: 'flag-wg-link',
+        title: 'WG LINK UP',
+        value: wgUp ? 'YES' : 'NO',
+        hint: `${metrics?.runtime?.wireguard?.interface || '-'} | peer ${formatNumber(metrics?.runtime?.wireguard?.connected_peers, 0)}/${formatNumber(metrics?.runtime?.wireguard?.configured_peers, 0)}`,
+        status: wgUp ? 'green' : 'red',
+      },
+      {
+        key: 'flag-lockout',
+        title: 'AUTH LOCKOUT ACTIVE',
+        value: lockout ? 'YES' : 'NO',
+        hint: 'credential spray resistance control',
+        status: lockout ? 'green' : 'amber',
+      },
+      {
+        key: 'flag-docs',
+        title: 'API DOCS LOCKED',
+        value: docsLocked ? 'YES' : 'NO',
+        hint: 'public surface minimization',
+        status: docsLocked ? 'green' : 'red',
+      },
+      {
+        key: 'flag-ratelimit',
+        title: 'RATE LIMITS ACTIVE',
+        value: rateLimits ? 'YES' : 'NO',
+        hint: 'abuse and burst damping',
+        status: rateLimits ? 'green' : 'red',
+      },
+      {
+        key: 'flag-crowdsec',
+        title: 'CROWDSEC HEALTH',
+        value: crowdsecHealthy ? 'YES' : 'NO',
+        hint: `status ${String(sidecars?.crowdsec?.status || 'unknown')}`,
+        status: crowdsecHealthy ? 'green' : 'red',
+      },
+      {
+        key: 'flag-trivy',
+        title: 'TRIVY FRESH',
+        value: trivyFresh ? 'YES' : 'NO',
+        hint: `db age ${formatNumber(sidecars?.trivy_server?.db_age_hours, 1)}h`,
+        status: trivyFresh ? 'green' : Number(sidecars?.trivy_server?.db_age_hours || 0) <= 72 ? 'amber' : 'red',
+      },
+      {
+        key: 'flag-parca',
+        title: 'PARCA PROFILING',
+        value: parcaProfiling ? 'YES' : 'NO',
+        hint: `cache ${String(sidecars?.parca?.cache_state || '-')}`,
+        status: parcaProfiling ? 'green' : 'amber',
+      },
+      {
+        key: 'flag-https',
+        title: 'HTTPS ACTIVE',
+        value: httpsActive ? 'YES' : 'NO',
+        hint: 'edge transport encryption policy',
+        status: httpsActive ? 'green' : 'red',
+      },
+    ]
+  }, [attestation, metrics])
 
   const sidecarDomainSignalCards = Object.entries(metrics?.runtime?.sidecars || {})
     .flatMap(([name, payload]) => sidecarDomainCards(name, payload))
@@ -511,9 +527,9 @@ function Operations() {
   return (
     <Box>
       <DenseGrid>
-        <DenseSection title="Operations Vitals" subtitle="top-line operational card deck" colSpan={3} rowSpan={1}>
+        <DenseSection title="Composite Readiness" subtitle="core readiness stack for trusted exchange operations" colSpan={1} rowSpan={1}>
           <DenseCards>
-            {cards.map((card) => (
+            {compositeCards.map((card) => (
               <DenseMetricCard
                 key={card.key}
                 title={card.title}
@@ -527,9 +543,9 @@ function Operations() {
           </DenseCards>
         </DenseSection>
 
-        <DenseSection title="Insight Cards" subtitle="attestation insight stream as cards" colSpan={3} rowSpan={1}>
-          <DenseCards>
-            {insightCards.map((card) => (
+        <DenseSection title="Status Flags" subtitle="logical binary controls grouped for rapid policy checks" colSpan={2} rowSpan={1}>
+          <DenseCards cols={4}>
+            {statusFlagCards.map((card) => (
               <DenseMetricCard
                 key={card.key}
                 title={card.title}
@@ -537,16 +553,14 @@ function Operations() {
                 hint={card.hint}
                 status={card.status}
                 importance={card.importance}
-                progressPercent={card.progressPercent}
-                trendValues={probeLatencyTrends[card.probeKey]}
               />
             ))}
           </DenseCards>
         </DenseSection>
 
-        <DenseSection title="Sidecar Cards" subtitle="3x1 expanded per-sidecar cards" colSpan={3} rowSpan={1}>
+        <DenseSection title="Sidecar Domain Signals" subtitle="core functionality cards per sidecar with observation timestamps" colSpan={3} rowSpan={1}>
           <DenseCards>
-            {sidecarCards.map((card) => (
+            {[...sidecarDomainSignalCards, ...insightCards].map((card) => (
               <DenseMetricCard
                 key={card.key}
                 title={card.title}
@@ -562,22 +576,6 @@ function Operations() {
         <DenseSection title="Sidecar API Probes" subtitle="endpoint-level checks beyond raw metrics" colSpan={3} rowSpan={1}>
           <DenseCards>
             {sidecarApiCards.map((card) => (
-              <DenseMetricCard
-                key={card.key}
-                title={card.title}
-                value={card.value}
-                hint={card.hint}
-                status={card.status}
-                importance={card.importance}
-                progressPercent={card.progressPercent}
-              />
-            ))}
-          </DenseCards>
-        </DenseSection>
-
-        <DenseSection title="Sidecar Domain Signals" subtitle="core functionality cards per sidecar with observation timestamps" colSpan={3} rowSpan={1}>
-          <DenseCards>
-            {sidecarDomainSignalCards.map((card) => (
               <DenseMetricCard
                 key={card.key}
                 title={card.title}

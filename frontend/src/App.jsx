@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Box, CircularProgress } from '@mui/material'
 import Layout from './components/Layout'
+import { useAuth } from './context/AuthContext'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Nodes = lazy(() => import('./pages/Nodes'))
@@ -21,6 +22,17 @@ function PageLoader() {
   )
 }
 
+function RequireAuth({ children }) {
+  const { isAuthenticated } = useAuth()
+  const location = useLocation()
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  }
+
+  return children
+}
+
 function App() {
   return (
     <Routes>
@@ -38,7 +50,7 @@ function App() {
         </Suspense>
       } />
       
-      <Route element={<Layout />}>
+      <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route path="/dashboard" element={
           <Suspense fallback={<PageLoader />}>
             <Dashboard />

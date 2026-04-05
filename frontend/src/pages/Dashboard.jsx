@@ -116,6 +116,14 @@ function Dashboard() {
         importance: 'Trust claims are only meaningful when evidence remains complete.',
       },
       {
+        key: 'insight-queue',
+        title: 'INSIGHT QUEUE',
+        value: `${insightCount}`,
+        hint: 'attestation-derived operator insights currently available',
+        status: insightCount > 0 ? 'green' : 'amber',
+        importance: 'Keeps analyst attention on live narrative intelligence volume.',
+      },
+      {
         key: 'metrics',
         title: 'METRICS TAB',
         value: `${probesUp}/${probes.length}`,
@@ -130,6 +138,14 @@ function Dashboard() {
         hint: `${backendReq.toLocaleString()} observed requests`,
         status: avgLatency <= 150 ? 'green' : avgLatency <= 450 ? 'amber' : 'red',
         importance: 'Sustained baseline latency is a leading operational fatigue indicator.',
+      },
+      {
+        key: 'traffic-volume',
+        title: 'TRAFFIC VOLUME',
+        value: `${backendReq.toLocaleString()} req`,
+        hint: 'backend request count in current runtime window',
+        status: backendReq > 0 ? 'green' : 'amber',
+        importance: 'Volume gives context for interpreting latency and error percentages.',
       },
       {
         key: 'ops',
@@ -190,14 +206,71 @@ function Dashboard() {
     return cards
   }, [attestation, clientStats, error, loading, metrics])
 
+  const pickCard = (key) => overviewCards.find((card) => card.key === key)
+
+  const missionGateCards = [
+    pickCard('link-state'),
+    pickCard('ops'),
+    pickCard('client-adoption'),
+    pickCard('attestation'),
+  ].filter(Boolean)
+
+  const pipelineCards = [
+    pickCard('logs'),
+    pickCard('latency-depth'),
+    pickCard('metrics'),
+    pickCard('log-load'),
+    pickCard('sidecar-health'),
+    pickCard('evidence'),
+  ].filter(Boolean)
+
+  const quickIntelCards = [
+    pickCard('clients'),
+    pickCard('threat-intel-freshness'),
+    pickCard('traffic-volume'),
+    pickCard('insight-queue'),
+  ].filter(Boolean)
+
+  const stateCards = overviewCards.filter((card) => card.key === 'error-state' || card.key === 'loading-state')
+
   return (
     <Box>
       <DenseGrid>
-        <DenseSection title="Cross-Tab Command Deck" subtitle="cards-only command surface | route paths embedded as datapoints" colSpan={3} rowSpan={3}>
-          <DenseCards>
-            {overviewCards.map((card) => (
+        <DenseSection title="Mission Gate" subtitle="trusted exchange hub mission posture" colSpan={3} rowSpan={1}>
+          <DenseCards cols={4}>
+            {missionGateCards.map((card) => (
               <DenseMetricCard
                 key={card.key}
+                title={card.title}
+                value={card.value}
+                hint={card.hint}
+                status={card.status}
+                importance={card.importance}
+              />
+            ))}
+          </DenseCards>
+        </DenseSection>
+
+        <DenseSection title="Pipeline Vitals" subtitle="numeric flow, latency, and evidence telemetry" colSpan={2} rowSpan={2}>
+          <DenseCards>
+            {[...stateCards, ...pipelineCards].map((card, index) => (
+              <DenseMetricCard
+                key={`${card.key}-${index}`}
+                title={card.title}
+                value={card.value}
+                hint={card.hint}
+                status={card.status}
+                importance={card.importance}
+              />
+            ))}
+          </DenseCards>
+        </DenseSection>
+
+        <DenseSection title="Quick Intel" subtitle="operator-first summary for regular 1080p workflows" colSpan={1} rowSpan={2}>
+          <DenseCards cols={1}>
+            {quickIntelCards.map((card, index) => (
+              <DenseMetricCard
+                key={`${card.key}-${index}`}
                 title={card.title}
                 value={card.value}
                 hint={card.hint}

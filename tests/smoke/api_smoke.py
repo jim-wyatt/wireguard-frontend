@@ -43,28 +43,28 @@ def main():
     assert_status("frontend root", status, 200)
     checks.append("frontend root 200")
 
-    status, body = request("/api/clients/stats", "GET")
+    status, body = request("/api/nodes/stats", "GET")
     assert_status("public stats", status, 200)
     json.loads(body)
     checks.append("public stats 200")
 
-    status, _ = request("/api/clients/connected", "GET")
+    status, _ = request("/api/nodes/connected", "GET")
     assert_status("protected connected list without auth", status, 401)
     checks.append("protected connected list rejects unauthenticated")
 
-    status, _ = request("/api/clients", "GET")
+    status, _ = request("/api/nodes", "GET")
     assert_status("protected clients list without auth", status, 401)
     checks.append("protected list rejects unauthenticated")
 
     if not API_TOKEN:
         print("API_AUTH_TOKEN not set; skipping authenticated smoke checks")
     else:
-        status, body = request("/api/clients", "GET", token=API_TOKEN)
+        status, body = request("/api/nodes", "GET", token=API_TOKEN)
         assert_status("protected clients list with auth", status, 200)
         json.loads(body)
         checks.append("protected list accepts operator token")
 
-        status, body = request("/api/clients/connected", "GET", token=API_TOKEN)
+        status, body = request("/api/nodes/connected", "GET", token=API_TOKEN)
         assert_status("protected connected list with auth", status, 200)
         json.loads(body)
         checks.append("protected connected list accepts operator token")

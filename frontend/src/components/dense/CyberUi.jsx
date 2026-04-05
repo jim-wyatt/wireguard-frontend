@@ -1,5 +1,12 @@
 import { Children } from 'react'
-import { Box, Chip, Paper, Stack, Typography, useMediaQuery, useTheme } from '@mui/material'
+import { Box, Paper, Stack, Typography, useMediaQuery, useTheme } from '@mui/material'
+
+// Status-driven visual tokens — colored border + subtle tint + glowing dot
+const RAG_TOKENS = {
+  red:   { border: 'rgba(229,57,53,0.85)',  bg: 'rgba(229,57,53,0.07)',   dot: '#ef5350' },
+  amber: { border: 'rgba(255,152,0,0.85)',  bg: 'rgba(255,152,0,0.055)',  dot: '#ff9800' },
+  green: { border: 'rgba(0,200,83,0.6)',    bg: 'rgba(0,200,83,0.035)',   dot: '#00c853' },
+}
 
 function normalizeSpan(span) {
   const n = Number(span) || 1
@@ -18,24 +25,6 @@ export function ragLabel(status) {
   return 'GREEN'
 }
 
-function statusFace(status) {
-  if (status === 'red') return '(x_x)'
-  if (status === 'amber') return '(-_-)'
-  return '(^_^)'
-}
-
-function asciiMeter(status) {
-  if (status === 'red') return '[##########]'
-  if (status === 'amber') return '[######----]'
-  return '[###-------]'
-}
-
-function statusGlyph(status) {
-  if (status === 'red') return '!!'
-  if (status === 'amber') return '!~'
-  return 'ok'
-}
-
 function compactSparkline(values) {
   const blocks = ['_', '.', ':', '-', '=', '+', '*', '#']
   const numbers = (values || []).filter((v) => Number.isFinite(v)).slice(-18)
@@ -51,12 +40,7 @@ function compactSparkline(values) {
     .join('')
 }
 
-function asciiProgress(valuePercent) {
-  if (!Number.isFinite(Number(valuePercent))) return '[----------]'
-  const clamped = Math.max(0, Math.min(100, Number(valuePercent)))
-  const filled = Math.round(clamped / 10)
-  return `[${'#'.repeat(filled)}${'-'.repeat(10 - filled)}]`
-}
+
 
 export function DenseGrid({ children }) {
   return (
@@ -100,6 +84,7 @@ export function DenseSection({ title, subtitle, colSpan = 1, rowSpan = 1, childr
         display: 'flex',
         flexDirection: 'column',
         overflowX: 'clip',
+        borderTop: '2px solid rgba(49,242,125,0.18)',
       }}
     >
       <Typography
@@ -130,13 +115,14 @@ export function DenseSection({ title, subtitle, colSpan = 1, rowSpan = 1, childr
   )
 }
 
-export function DenseCards({ children }) {
+export function DenseCards({ children, cols }) {
   const theme = useTheme()
   const isXl = useMediaQuery(theme.breakpoints.up('xl'))
   const isLg = useMediaQuery(theme.breakpoints.up('lg'))
   const isMd = useMediaQuery(theme.breakpoints.up('md'))
 
-  const columns = isXl ? 4 : isLg ? 3 : isMd ? 2 : 1
+  const autoColumns = isXl ? 4 : isLg ? 3 : isMd ? 2 : 1
+  const columns = cols || autoColumns
   const cardItems = Children.toArray(children)
   const fillerCount = (columns - (cardItems.length % columns)) % columns
 
@@ -144,8 +130,9 @@ export function DenseCards({ children }) {
     <Box
       sx={{
         display: 'grid',
-        // Keep cards strictly vertical on phones and small tablets.
-        gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))', xl: 'repeat(4, minmax(0, 1fr))' },
+        gridTemplateColumns: cols
+          ? `repeat(${cols}, minmax(0, 1fr))`
+          : { xs: 'minmax(0, 1fr)', md: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))', xl: 'repeat(4, minmax(0, 1fr))' },
         gridAutoRows: '1fr',
         gap: 1,
         width: '100%',
@@ -175,11 +162,13 @@ export function DenseCards({ children }) {
 }
 
 export function DenseMetricCard({ title, value, hint, status = 'green', importance, trendValues, progressPercent }) {
+  const tok = RAG_TOKENS[status] || RAG_TOKENS.green
+  const sparkline = compactSparkline(trendValues)
   return (
     <Paper
       sx={{
-        p: 0.9,
-        minHeight: 152,
+        p: 1,
+        minHeight: 140,
         height: '100%',
         width: '100%',
         minWidth: 0,
@@ -187,59 +176,69 @@ export function DenseMetricCard({ title, value, hint, status = 'green', importan
         flexDirection: 'column',
         justifyContent: 'space-between',
         overflow: 'hidden',
-        backgroundImage: 'linear-gradient(180deg, rgba(49,242,125,0.05), rgba(49,242,125,0.01))',
+        borderLeft: `4px solid ${tok.border}`,
+        bgcolor: tok.bg,
+        backgroundImage: 'none',
+        transition: 'background-color 0.25s ease',
       }}
     >
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.35 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 0.4 }}>
         <Typography
           variant="caption"
-          color="text.secondary"
           sx={{
-            letterSpacing: 0.6,
+            letterSpacing: 0.7,
+            fontWeight: 600,
+            fontSize: '0.67rem',
             minWidth: 0,
             flex: 1,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
             pr: 0.5,
+            color: 'text.secondary',
           }}
         >
-          {statusFace(status)} {title}
+          {title}
         </Typography>
-        <Chip
-          size="small"
-          label={`${ragLabel(status)} ${statusGlyph(status)}`}
-          color={ragColor(status)}
-          sx={{ flexShrink: 0, maxWidth: '46%' }}
+        <Box
+          sx={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            bgcolor: tok.dot,
+            mt: 0.25,
+            flexShrink: 0,
+            boxShadow: `0 0 5px ${tok.dot}88`,
+          }}
         />
       </Stack>
       <Typography
         variant="h6"
-        sx={{
-          lineHeight: 1.2,
-          minWidth: 0,
-          overflowWrap: 'anywhere',
-          wordBreak: 'break-word',
-        }}
+        sx={{ lineHeight: 1.2, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontWeight: 700 }}
       >
         {value}
       </Typography>
-      <Typography variant="caption" sx={{ mt: 0.25, fontFamily: 'monospace', opacity: 0.9 }}>
-        {progressPercent === undefined ? asciiMeter(status) : asciiProgress(progressPercent)}
-      </Typography>
-      <Typography variant="caption" sx={{ mt: 0.2, fontFamily: 'monospace', opacity: 0.82 }}>
-        {compactSparkline(trendValues)}
-      </Typography>
+      {sparkline ? (
+        <Typography variant="caption" sx={{ fontFamily: 'monospace', opacity: 0.7, letterSpacing: 0.5, mt: 0.2 }}>
+          {sparkline}
+        </Typography>
+      ) : null}
+      {progressPercent !== undefined ? (
+        <Box sx={{ mt: 0.4, height: 3, borderRadius: 1, bgcolor: 'action.disabledBackground', overflow: 'hidden' }}>
+          <Box
+            sx={{
+              height: '100%',
+              width: `${Math.max(0, Math.min(100, Number(progressPercent) || 0))}%`,
+              bgcolor: tok.dot,
+              transition: 'width 0.4s ease',
+            }}
+          />
+        </Box>
+      ) : null}
       <Typography
         variant="caption"
         color="text.secondary"
-        sx={{
-          display: 'block',
-          mt: 0.45,
-          minWidth: 0,
-          overflowWrap: 'anywhere',
-          wordBreak: 'break-word',
-        }}
+        sx={{ display: 'block', mt: 0.45, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', lineHeight: 1.4 }}
       >
         {hint}
       </Typography>
@@ -247,17 +246,16 @@ export function DenseMetricCard({ title, value, hint, status = 'green', importan
         <Typography
           variant="caption"
           sx={{
-            opacity: 0.82,
-            mt: 0.45,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
+            opacity: 0.5,
+            display: 'block',
+            mt: 0.3,
+            lineHeight: 1.25,
+            overflowWrap: 'anywhere',
             wordBreak: 'break-word',
+            fontSize: '0.6rem',
           }}
         >
-          Why : {importance}
+          {importance}
         </Typography>
       ) : null}
     </Paper>

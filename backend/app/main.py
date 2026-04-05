@@ -3,8 +3,9 @@ from collections.abc import AsyncIterator
 import logging
 import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from app.core.config import settings
 from app.core.internal_metrics import internal_metrics
 from app.core.logging_config import configure_logging
@@ -59,11 +60,20 @@ def create_app() -> FastAPI:
     )
 
     # Include routers
-    app.include_router(clients.router, prefix="/api", tags=["clients"])
+    app.include_router(clients.router, prefix="/api", tags=["nodes"])
     app.include_router(logs.router, prefix="/api", tags=["logs"])
     app.include_router(attestation.router, prefix="/api", tags=["attestation"])
     app.include_router(metrics.router, prefix="/api", tags=["metrics"])
     app.include_router(debug.router, prefix="/api", tags=["debug"])
+
+    # Backward-compat: redirect /clients/* → /nodes/* (308 preserves method+body)
+    @app.api_route("/api/clients/{path:path}", methods=["GET", "POST", "PATCH", "DELETE"], include_in_schema=False)
+    async def clients_compat_redirect(path: str, request: Request):  # noqa: ARG001
+        return RedirectResponse(url=f"/api/nodes/{path}", status_code=308)
+
+    @app.api_route("/api/clients", methods=["GET", "POST"], include_in_schema=False)
+    async def clients_root_compat(request: Request):  # noqa: ARG001
+        return RedirectResponse(url="/api/nodes", status_code=308)
 
     @app.middleware("http")
     async def capture_internal_metrics(request, call_next):

@@ -846,9 +846,6 @@ def _source_probes() -> list[dict]:
         ("falcosidekick", settings.FALCOSIDEKICK_ENDPOINT_URL),
         ("crowdsec", settings.CROWDSEC_ENDPOINT_URL),
         ("trivy-server", settings.TRIVY_SERVER_ENDPOINT_URL),
-        ("wazuh-api", settings.WAZUH_API_ENDPOINT_URL),
-        ("fleet-api", settings.FLEET_API_ENDPOINT_URL),
-        ("osquery-exporter", settings.OSQUERY_EXPORTER_ENDPOINT_URL),
     ]
 
     probes: list[dict] = []
@@ -1068,8 +1065,11 @@ def _parca_runtime() -> dict:
     cache_hit = _safe_metric(parsed, "cache_requests_total", labels={"result": "hit"})
     cache_miss = _safe_metric(parsed, "cache_requests_total", labels={"result": "miss"})
     cache_hit_percent = None
-    if cache_hit is not None and cache_miss is not None and (cache_hit + cache_miss) > 0:
-        cache_hit_percent = (cache_hit / (cache_hit + cache_miss)) * 100.0
+    cache_total = None
+    if cache_hit is not None and cache_miss is not None:
+        cache_total = cache_hit + cache_miss
+        if cache_total > 0:
+            cache_hit_percent = (cache_hit / cache_total) * 100.0
 
     grpc_write_ok = _safe_metric(parsed, "grpc_server_handled_total", labels={
         "grpc_method": "WriteRaw",
@@ -1082,6 +1082,7 @@ def _parca_runtime() -> dict:
         "resident_memory_bytes": _safe_metric(parsed, "process_resident_memory_bytes"),
         "frostdb_lsm_size_bytes": lsm_size,
         "debuginfod_cache_hit_percent": cache_hit_percent,
+        "debuginfod_cache_total": cache_total,
         "grpc_write_raw_ok_total": grpc_write_ok,
     }
     base = settings.PARCA_SERVER_ENDPOINT_URL.rstrip("/")
@@ -1167,7 +1168,7 @@ def _trivy_runtime() -> dict:
     base = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else settings.TRIVY_SERVER_ENDPOINT_URL.rstrip("/")
     probes = [
         _probe_endpoint_detail(settings.TRIVY_SERVER_ENDPOINT_URL, expect_json=True, name="version"),
-        _probe_endpoint_detail(f"{base}/health", expect_json=False, name="health"),
+        _probe_endpoint_detail(f"{base}/healthz", expect_json=False, name="health"),
     ]
     return _build_sidecar_payload(sidecar_payload, probes)
 
@@ -1239,9 +1240,6 @@ def _sidecar_runtime() -> dict:
         "ebpf_agent": _cached_sidecar_probe("ebpf_agent", _ebpf_agent_runtime),
         "crowdsec": _cached_sidecar_probe("crowdsec", _crowdsec_runtime),
         "trivy_server": _cached_sidecar_probe("trivy_server", _trivy_runtime),
-        "wazuh_api": _optional_api_sidecar_runtime(settings.WAZUH_API_ENDPOINT_URL),
-        "fleet_api": _optional_api_sidecar_runtime(settings.FLEET_API_ENDPOINT_URL),
-        "osquery_exporter": _optional_api_sidecar_runtime(settings.OSQUERY_EXPORTER_ENDPOINT_URL),
     }
 
 

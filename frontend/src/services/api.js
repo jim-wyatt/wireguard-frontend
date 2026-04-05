@@ -30,10 +30,10 @@ api.interceptors.request.use((config) => {
 
 export const clientsApi = {
   // Get all clients
-  getClients: () => api.get('/clients'),
+  getClients: () => api.get('/nodes'),
   
   // Get client stats
-  getStats: () => api.get('/clients/stats', {
+  getStats: () => api.get('/nodes/stats', {
     params: { _ts: Date.now() },
     headers: {
       'Cache-Control': 'no-cache',
@@ -42,7 +42,7 @@ export const clientsApi = {
   }),
   
   // Get connected clients
-  getConnectedClients: () => api.get('/clients/connected', {
+  getConnectedClients: () => api.get('/nodes/connected', {
     params: { _ts: Date.now() },
     headers: {
       'Cache-Control': 'no-cache',
@@ -51,19 +51,19 @@ export const clientsApi = {
   }),
   
   // Get single client
-  getClient: (id) => api.get(`/clients/${id}`),
+  getClient: (id) => api.get(`/nodes/${id}`),
   
   // Create new client
-  createClient: (data) => api.post('/clients', data),
+  createClient: (data) => api.post('/nodes', data),
   
   // Get client config
-  getClientConfig: (id) => api.get(`/clients/${id}/config`),
+  getClientConfig: (id) => api.get(`/nodes/${id}/config`),
   
   // Delete client
-  deleteClient: (id) => api.delete(`/clients/${id}`),
+  deleteClient: (id) => api.delete(`/nodes/${id}`),
   
   // Toggle client status
-  toggleClientStatus: (id) => api.patch(`/clients/${id}/toggle`),
+  toggleClientStatus: (id) => api.patch(`/nodes/${id}/toggle`),
 
   // Stream log lines from a selected source.
   streamLogs: async ({ signal, source = 'caddy', tail = 100, follow = true, onLine }) => {

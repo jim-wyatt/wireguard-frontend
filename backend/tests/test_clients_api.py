@@ -14,7 +14,7 @@ def _mock_wireguard(monkeypatch):
 
 def test_create_client_requires_authentication(unauthenticated_client):
     response = unauthenticated_client.post(
-        "/api/clients",
+        "/api/nodes",
         json={"email": "noauth@example.com", "name": "NoAuth"},
     )
 
@@ -36,20 +36,20 @@ def test_management_reads_require_authentication(unauthenticated_client, db_sess
     db_session.commit()
     db_session.refresh(db_client)
 
-    list_response = unauthenticated_client.get("/api/clients")
+    list_response = unauthenticated_client.get("/api/nodes")
     assert list_response.status_code == 401
 
-    detail_response = unauthenticated_client.get(f"/api/clients/{db_client.id}")
+    detail_response = unauthenticated_client.get(f"/api/nodes/{db_client.id}")
     assert detail_response.status_code == 401
 
 
 def test_dashboard_reads_are_public(unauthenticated_client, monkeypatch):
     monkeypatch.setattr(clients_api.wireguard_service, "get_connected_peers", lambda: {})
 
-    stats = unauthenticated_client.get("/api/clients/stats")
+    stats = unauthenticated_client.get("/api/nodes/stats")
     assert stats.status_code == 200
 
-    connected = unauthenticated_client.get("/api/clients/connected")
+    connected = unauthenticated_client.get("/api/nodes/connected")
     assert connected.status_code == 401
 
 
@@ -61,7 +61,7 @@ def test_create_client_and_reject_duplicate_email(client, monkeypatch):
         "name": "Alice",
     }
 
-    response = client.post("/api/clients", json=payload)
+    response = client.post("/api/nodes", json=payload)
     assert response.status_code == 201
     body = response.json()
     assert body["email"] == "alice@example.com"
@@ -69,7 +69,7 @@ def test_create_client_and_reject_duplicate_email(client, monkeypatch):
     assert body["ip_address"] == "10.0.0.2"
     assert body["is_active"] is True
 
-    duplicate = client.post("/api/clients", json=payload)
+    duplicate = client.post("/api/nodes", json=payload)
     assert duplicate.status_code == 400
     assert duplicate.json()["detail"] == "Email already registered"
 
@@ -114,7 +114,7 @@ def test_stats_and_connected_clients(client, db_session, monkeypatch):
         },
     )
 
-    stats = client.get("/api/clients/stats")
+    stats = client.get("/api/nodes/stats")
     assert stats.status_code == 200
     stats_body = stats.json()
     assert stats_body["total_clients"] == 2
@@ -122,7 +122,7 @@ def test_stats_and_connected_clients(client, db_session, monkeypatch):
     assert stats_body["connected_clients"] == 1
     assert "last_updated" in stats_body
 
-    connected = client.get("/api/clients/connected")
+    connected = client.get("/api/nodes/connected")
     assert connected.status_code == 200
     body = connected.json()
     assert len(body) == 1
@@ -160,15 +160,15 @@ def test_toggle_and_delete_client(client, db_session, monkeypatch):
     db_session.commit()
     db_session.refresh(db_client)
 
-    deactivate = client.patch(f"/api/clients/{db_client.id}/toggle")
+    deactivate = client.patch(f"/api/nodes/{db_client.id}/toggle")
     assert deactivate.status_code == 200
     assert deactivate.json()["is_active"] is False
     assert toggled["removed"] == 1
 
-    activate = client.patch(f"/api/clients/{db_client.id}/toggle")
+    activate = client.patch(f"/api/nodes/{db_client.id}/toggle")
     assert activate.status_code == 200
     assert activate.json()["is_active"] is True
     assert toggled["added"] == 1
 
-    deleted = client.delete(f"/api/clients/{db_client.id}")
+    deleted = client.delete(f"/api/nodes/{db_client.id}")
     assert deleted.status_code == 204

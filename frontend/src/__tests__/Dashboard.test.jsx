@@ -61,12 +61,12 @@ describe('Dashboard', () => {
       expect(clientsApi.getAttestationSummary).toHaveBeenCalledTimes(1)
     })
 
-    expect(await screen.findByText(/Cross-Tab Command Deck/)).toBeInTheDocument()
+    expect(await screen.findByText(/Mission Gate/)).toBeInTheDocument()
     expect(screen.getByText(/NODES TAB/)).toBeInTheDocument()
     expect(screen.getByText(/LOGS TAB/)).toBeInTheDocument()
-    expect(screen.getByText(/ATTESTATION TAB/)).toBeInTheDocument()
-    expect(screen.getByText(/METRICS TAB/)).toBeInTheDocument()
-    expect(screen.getByText(/OPERATIONS TAB/)).toBeInTheDocument()
+    expect(screen.getAllByText(/ATTESTATION TAB/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/METRICS TAB/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/OPERATIONS TAB/).length).toBeGreaterThan(0)
   })
 
   it('still renders cards when values are zero', async () => {

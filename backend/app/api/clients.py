@@ -96,7 +96,7 @@ def _public_connected_view(client: Client, peer_info: dict) -> ClientConnected:
         transfer_tx=peer_info["transfer_tx"],
     )
 
-@router.post("/clients", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/nodes", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
 async def create_client(
     client: ClientCreate,
     db: Session = Depends(get_db),
@@ -173,7 +173,7 @@ async def create_client(
             detail="Failed to create client"
         )
 
-@router.get("/clients", response_model=List[ClientResponse])
+@router.get("/nodes", response_model=List[ClientResponse])
 async def list_clients(
     request: Request,
     response: Response,
@@ -199,7 +199,7 @@ async def list_clients(
 
     return clients
 
-@router.get("/clients/stats", response_model=ClientStats)
+@router.get("/nodes/stats", response_model=ClientStats)
 async def get_stats(
     response: Response,
     db: Session = Depends(get_db),
@@ -234,7 +234,7 @@ async def get_stats(
         last_updated=now,
     )
 
-@router.get("/clients/connected", response_model=List[ClientConnected])
+@router.get("/nodes/connected", response_model=List[ClientConnected])
 async def get_connected_clients(
     request: Request,
     response: Response,
@@ -288,7 +288,7 @@ async def get_connected_clients(
     
     return connected_clients
 
-@router.get("/clients/{client_id}", response_model=ClientResponse)
+@router.get("/nodes/{client_id}", response_model=ClientResponse)
 async def get_client(
     request: Request,
     client_id: int,
@@ -305,7 +305,7 @@ async def get_client(
         )
     return client
 
-@router.get("/clients/{client_id}/config", response_model=ClientConfig)
+@router.get("/nodes/{client_id}/config", response_model=ClientConfig)
 async def get_client_config(
     client_id: int,
     db: Session = Depends(get_db),
@@ -337,7 +337,7 @@ async def get_client_config(
     
     return ClientConfig(config=config, qr_code=qr_code)
 
-@router.delete("/clients/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/nodes/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_client(
     client_id: int,
     db: Session = Depends(get_db),
@@ -365,7 +365,7 @@ async def delete_client(
     
     return None
 
-@router.patch("/clients/{client_id}/toggle", response_model=ClientResponse)
+@router.patch("/nodes/{client_id}/toggle", response_model=ClientResponse)
 async def toggle_client_status(
     client_id: int,
     db: Session = Depends(get_db),

@@ -24,7 +24,7 @@ Check if the API is running.
 
 ### Client Management
 
-#### POST /api/clients
+#### POST /api/nodes
 Create a new WireGuard client.
 
 **Request Body:**
@@ -56,7 +56,7 @@ Create a new WireGuard client.
 
 ---
 
-#### GET /api/clients
+#### GET /api/nodes
 List all clients.
 
 **Query Parameters:**
@@ -83,7 +83,7 @@ List all clients.
 
 ---
 
-#### GET /api/clients/stats
+#### GET /api/nodes/stats
 Get client statistics.
 
 **Response:** `200 OK`
@@ -97,7 +97,7 @@ Get client statistics.
 
 ---
 
-#### GET /api/clients/connected
+#### GET /api/nodes/connected
 Get list of currently connected clients.
 
 **Response:** `200 OK`
@@ -117,7 +117,7 @@ Get list of currently connected clients.
 
 ---
 
-#### GET /api/clients/{client_id}
+#### GET /api/nodes/{client_id}
 Get details of a specific client.
 
 **Response:** `200 OK`
@@ -140,7 +140,7 @@ Get details of a specific client.
 
 ---
 
-#### GET /api/clients/{client_id}/config
+#### GET /api/nodes/{client_id}/config
 Get client configuration file and QR code.
 
 **Response:** `200 OK`
@@ -156,7 +156,7 @@ Get client configuration file and QR code.
 
 ---
 
-#### PATCH /api/clients/{client_id}/toggle
+#### PATCH /api/nodes/{client_id}/toggle
 Toggle client active status (enable/disable).
 
 **Response:** `200 OK`
@@ -179,7 +179,7 @@ Toggle client active status (enable/disable).
 
 ---
 
-#### DELETE /api/clients/{client_id}
+#### DELETE /api/nodes/{client_id}
 Delete a client.
 
 **Response:** `204 No Content`
