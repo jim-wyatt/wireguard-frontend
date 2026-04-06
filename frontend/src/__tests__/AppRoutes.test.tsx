@@ -37,12 +37,7 @@ vi.mock('../pages/Login', () => ({
 }))
 
 vi.mock('../pages/PublicDashboard', () => ({
-  default: () => (
-    <div>
-      <div>Public Network Status</div>
-      <button>Login for Admin Access</button>
-    </div>
-  ),
+  default: () => <div>Public Network Status</div>,
 }))
 
 function LocationProbe() {
@@ -68,7 +63,6 @@ describe('App routing', () => {
     )
 
     expect(await screen.findByText('Public Network Status')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Login for Admin Access' })).toBeInTheDocument()
     expect(screen.getByTestId('location-path')).toHaveTextContent(/^\/$/)
     expect(screen.queryByText('Login Page')).not.toBeInTheDocument()
   })
