@@ -4,6 +4,7 @@ import {
   AppBar,
   Avatar,
   Box,
+  Button,
   IconButton,
   Menu,
   MenuItem,
@@ -53,6 +54,8 @@ function Layout() {
   ]
 
   useEffect(() => {
+    if (!isAuthenticated) return
+
     const navHotkeys: Record<string, string> = {
       '1': '/dashboard',
       '2': '/nodes',
@@ -78,7 +81,7 @@ function Layout() {
 
     window.addEventListener('keydown', onKeydown)
     return () => window.removeEventListener('keydown', onKeydown)
-  }, [navigate])
+  }, [isAuthenticated, navigate])
 
   useEffect(() => {
     let lastY = window.scrollY
@@ -134,8 +137,23 @@ function Layout() {
             </IconButton>
           </Tooltip>
 
+          {!isAuthenticated && (
+            <Button
+              color="primary"
+              variant="contained"
+              size="small"
+              startIcon={<LoginIcon fontSize="small" />}
+              onClick={() => navigate('/login')}
+              sx={{ ml: 0.75, display: { xs: 'none', sm: 'inline-flex' } }}
+            >
+              Sign In
+            </Button>
+          )}
+
           <IconButton color="inherit" size="small" onClick={(e) => setMenuAnchor(e.currentTarget)}>
-            <Avatar sx={{ width: 26, height: 26, bgcolor: 'secondary.main', fontSize: 12 }}>A</Avatar>
+            <Avatar sx={{ width: 26, height: 26, bgcolor: 'secondary.main', fontSize: 12 }}>
+              {isAuthenticated ? 'A' : 'G'}
+            </Avatar>
           </IconButton>
           <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
             {isAuthenticated ? (
@@ -164,51 +182,53 @@ function Layout() {
         <Outlet />
       </Box>
 
-      <Paper
-        sx={{
-          position: 'fixed',
-          bottom: 10,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 'min(840px, calc(100% - 24px))',
-          p: 0.7,
-          zIndex: (theme) => theme.zIndex.appBar + 1,
-          borderRadius: 1,
-          bgcolor: 'background.paper',
-          border: '1px solid rgba(49, 242, 125, 0.28)',
-          overflowX: 'hidden',
-          opacity: dockVisible ? 1 : 0,
-          pointerEvents: dockVisible ? 'auto' : 'none',
-          transition: 'opacity 160ms ease',
-        }}
-      >
-        <Stack direction="row" spacing={0.25} justifyContent="space-between" useFlexGap sx={{ minWidth: 0 }}>
-          {navItems.map((item) => {
-            const active = location.pathname === item.path
-            return (
-              <Tooltip key={item.path} title={`${item.text} (${navItems.indexOf(item) + 1})`}>
-                <IconButton
-                  size="small"
-                  onClick={() => navigate(item.path)}
-                  sx={{
-                    px: { xs: 0.5, sm: 1.15 },
-                    py: 0.45,
-                    borderRadius: 1,
-                    minWidth: 0,
-                    border: active ? '1px solid rgba(49,242,125,0.45)' : '1px solid transparent',
-                    bgcolor: active ? 'rgba(49,242,125,0.12)' : 'transparent',
-                  }}
-                >
-                  <Stack direction="row" spacing={0.35} alignItems="center" sx={{ minWidth: 0 }}>
-                    {item.icon}
-                    <Typography variant="caption" sx={{ display: { xs: 'none', sm: 'block' } }}>{item.text}</Typography>
-                  </Stack>
-                </IconButton>
-              </Tooltip>
-            )
-          })}
-        </Stack>
-      </Paper>
+      {isAuthenticated && (
+        <Paper
+          sx={{
+            position: 'fixed',
+            bottom: 10,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 'min(840px, calc(100% - 24px))',
+            p: 0.7,
+            zIndex: (theme) => theme.zIndex.appBar + 1,
+            borderRadius: 1,
+            bgcolor: 'background.paper',
+            border: '1px solid rgba(49, 242, 125, 0.28)',
+            overflowX: 'hidden',
+            opacity: dockVisible ? 1 : 0,
+            pointerEvents: dockVisible ? 'auto' : 'none',
+            transition: 'opacity 160ms ease',
+          }}
+        >
+          <Stack direction="row" spacing={0.25} justifyContent="space-between" useFlexGap sx={{ minWidth: 0 }}>
+            {navItems.map((item) => {
+              const active = location.pathname === item.path
+              return (
+                <Tooltip key={item.path} title={`${item.text} (${navItems.indexOf(item) + 1})`}>
+                  <IconButton
+                    size="small"
+                    onClick={() => navigate(item.path)}
+                    sx={{
+                      px: { xs: 0.5, sm: 1.15 },
+                      py: 0.45,
+                      borderRadius: 1,
+                      minWidth: 0,
+                      border: active ? '1px solid rgba(49,242,125,0.45)' : '1px solid transparent',
+                      bgcolor: active ? 'rgba(49,242,125,0.12)' : 'transparent',
+                    }}
+                  >
+                    <Stack direction="row" spacing={0.35} alignItems="center" sx={{ minWidth: 0 }}>
+                      {item.icon}
+                      <Typography variant="caption" sx={{ display: { xs: 'none', sm: 'block' } }}>{item.text}</Typography>
+                    </Stack>
+                  </IconButton>
+                </Tooltip>
+              )
+            })}
+          </Stack>
+        </Paper>
+      )}
     </Box>
   )
 }

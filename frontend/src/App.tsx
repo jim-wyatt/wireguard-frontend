@@ -34,15 +34,24 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const { isAuthenticated } = useAuth()
+
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-      <Route path="/public" element={
-        <Suspense fallback={<PageLoader />}>
-          <PublicDashboard />
-        </Suspense>
-      } />
+      <Route path="/public" element={<Navigate to="/dashboard" replace />} />
+
+      <Route element={<Layout />}>
+        <Route
+          path="/dashboard"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              {isAuthenticated ? <Dashboard /> : <PublicDashboard />}
+            </Suspense>
+          }
+        />
+      </Route>
 
       <Route path="/login" element={
         <Suspense fallback={<PageLoader />}>
@@ -51,11 +60,6 @@ function App() {
       } />
 
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
-        <Route path="/dashboard" element={
-          <Suspense fallback={<PageLoader />}>
-            <Dashboard />
-          </Suspense>
-        } />
         <Route path="/nodes" element={
           <Suspense fallback={<PageLoader />}>
             <Nodes />

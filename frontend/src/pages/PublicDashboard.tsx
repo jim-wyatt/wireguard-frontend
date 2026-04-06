@@ -1,6 +1,10 @@
+import LoginIcon from '@mui/icons-material/Login'
+import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import { useEffect, useState } from 'react'
-import { Box } from '@mui/material'
+import { useNavigate } from 'react-router-dom'
+import { Box, Button, Stack, Typography } from '@mui/material'
 import { clientsApi } from '../services/api'
+import { useAuth } from '../context/AuthContext'
 import { DenseCards, DenseGrid, DenseMetricCard, DenseSection } from '../components/dense/CyberUi'
 import type { RagStatus } from '../components/dense/CyberUi'
 
@@ -21,6 +25,8 @@ interface CardItem {
 }
 
 function PublicDashboard() {
+  const navigate = useNavigate()
+  const { isAuthenticated } = useAuth()
   const [stats, setStats] = useState<NodeStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -134,6 +140,27 @@ function PublicDashboard() {
 
   return (
     <Box sx={{ px: 1.5, pt: 1.5, pb: 3 }}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={1.5}
+        alignItems={{ xs: 'flex-start', sm: 'center' }}
+        justifyContent="space-between"
+        sx={{ px: 0.5, mb: 1.5 }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          Public overview is visible to everyone. Sign in to manage nodes, logs, trust, and operations.
+        </Typography>
+        <Button
+          variant={isAuthenticated ? 'outlined' : 'contained'}
+          color="primary"
+          size="small"
+          startIcon={isAuthenticated ? <OpenInNewIcon /> : <LoginIcon />}
+          onClick={() => navigate(isAuthenticated ? '/nodes' : '/login')}
+        >
+          {isAuthenticated ? 'Open Admin Console' : 'Login for Admin Access'}
+        </Button>
+      </Stack>
+
       <DenseGrid>
         <DenseSection title="Public Network Status" subtitle="live node participation — no auth required" colSpan={3} rowSpan={3}>
           <DenseCards>
