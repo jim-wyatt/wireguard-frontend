@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import App from '../App'
 import { AuthProvider } from '../context/AuthContext'
 import { UiProvider } from '../context/UiContext'
@@ -45,6 +45,11 @@ vi.mock('../pages/PublicDashboard', () => ({
   ),
 }))
 
+function LocationProbe() {
+  const location = useLocation()
+  return <div data-testid="location-path">{location.pathname}</div>
+}
+
 describe('App routing', () => {
   beforeEach(() => {
     window.localStorage.clear()
@@ -56,6 +61,7 @@ describe('App routing', () => {
         <UiProvider>
           <AuthProvider>
             <App />
+            <LocationProbe />
           </AuthProvider>
         </UiProvider>
       </MemoryRouter>,
@@ -63,6 +69,7 @@ describe('App routing', () => {
 
     expect(await screen.findByText('Public Network Status')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Login for Admin Access' })).toBeInTheDocument()
+    expect(screen.getByTestId('location-path')).toHaveTextContent(/^\/$/)
     expect(screen.queryByText('Login Page')).not.toBeInTheDocument()
   })
 
@@ -72,6 +79,7 @@ describe('App routing', () => {
         <UiProvider>
           <AuthProvider>
             <App />
+            <LocationProbe />
           </AuthProvider>
         </UiProvider>
       </MemoryRouter>,

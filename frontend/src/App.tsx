@@ -36,21 +36,18 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function App() {
   const { isAuthenticated } = useAuth()
 
+  const dashboardElement = (
+    <Suspense fallback={<PageLoader />}>
+      {isAuthenticated ? <Dashboard /> : <PublicDashboard />}
+    </Suspense>
+  )
+
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
-      <Route path="/public" element={<Navigate to="/dashboard" replace />} />
-
       <Route element={<Layout />}>
-        <Route
-          path="/dashboard"
-          element={
-            <Suspense fallback={<PageLoader />}>
-              {isAuthenticated ? <Dashboard /> : <PublicDashboard />}
-            </Suspense>
-          }
-        />
+        <Route path="/" element={dashboardElement} />
+        <Route path="/dashboard" element={dashboardElement} />
+        <Route path="/public" element={<Navigate to="/" replace />} />
       </Route>
 
       <Route path="/login" element={
@@ -93,7 +90,7 @@ function App() {
         } />
       </Route>
 
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

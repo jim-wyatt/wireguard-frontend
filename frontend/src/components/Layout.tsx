@@ -160,7 +160,7 @@ function Layout() {
               <MenuItem onClick={() => {
                 setMenuAnchor(null)
                 logout()
-                navigate('/login')
+                navigate('/')
               }}>
                 <LogoutIcon sx={{ mr: 1 }} fontSize="small" />
                 Logout
