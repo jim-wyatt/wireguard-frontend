@@ -1,4 +1,4 @@
-.PHONY: help dev-setup dev-up dev-down prod-build prod-up prod-down logs clean test lint format smoke e2e
+.PHONY: help dev-setup dev-up dev-down prod-build prod-up prod-down prod-install-service logs clean test lint format smoke e2e
 
 CONTAINER_ENGINE ?= podman
 COMPOSE ?= $(CONTAINER_ENGINE) compose
@@ -57,6 +57,14 @@ prod-up:
 prod-down:
 	@echo "Stopping production environment..."
 	$(PROD_COMPOSE) -f compose.prod.yml down
+
+prod-install-service:
+	@echo "Installing boot-time systemd unit for the production stack..."
+	sudo install -m 0755 scripts/prod-stack-systemd.sh /usr/local/bin/wg-prod-stack
+	sudo install -m 0644 systemd/wg-prod.service /etc/systemd/system/wg-prod.service
+	sudo systemctl daemon-reload
+	sudo systemctl enable wg-prod.service
+	@echo "Installed and enabled wg-prod.service"
 
 logs:
 	$(COMPOSE) logs -f
