@@ -24,7 +24,7 @@ PROCESS_STARTED_AT = time.time()
 _PROM_LINE_RE = re.compile(
     r"^([a-zA-Z_:][a-zA-Z0-9_:]*)(\{[^}]*\})?\s+([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)"
 )
-_PROM_LABEL_RE = re.compile(r'(\w+)="((?:\\.|[^"])*)"')
+_PROM_LABEL_RE = re.compile(r'(\w+)="((?:\\.|[^"\\])*)"')
 
 
 def _resolve_report_path(filename: str) -> Path:
