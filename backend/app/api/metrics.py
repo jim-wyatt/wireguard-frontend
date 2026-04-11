@@ -22,7 +22,7 @@ router = APIRouter()
 _METRIC_LINE_RE = re.compile(
     r"^([a-zA-Z_:][a-zA-Z0-9_:]*)(\{[^}]*\})?\s+([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?|NaN|[+-]Inf)(?:\s+\d+)?$"
 )
-_LABEL_RE = re.compile(r'(\w+)="((?:\\.|[^"])*)"')
+_LABEL_RE = re.compile(r'(\w+)="((?:\\.|[^"\\])*)"')
 _LAST_CPU_SNAPSHOT: tuple[int, int] | None = None
 _SIDECAR_CACHE: dict[str, dict] = {}
 

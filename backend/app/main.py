@@ -69,8 +69,9 @@ def create_app() -> FastAPI:
     # Backward-compat: keep legacy /clients endpoints discoverable and redirect
     # them to the canonical /peers routes (308 preserves method and body).
     def _peers_redirect(path: str = "") -> RedirectResponse:
-        suffix = f"/{path.lstrip('/')}" if path else ""
-        return RedirectResponse(url=f"/api/peers{suffix}", status_code=308)
+        clean = path.lstrip('/')
+        url = "/api/peers/" + clean if clean else "/api/peers"
+        return RedirectResponse(url=url, status_code=308)
 
     @app.api_route("/api/clients", methods=["GET", "POST"])
     async def clients_root_compat(request: Request):  # noqa: ARG001
