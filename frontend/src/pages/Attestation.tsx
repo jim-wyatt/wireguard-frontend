@@ -3,6 +3,7 @@ import { Box } from '@mui/material'
 import { clientsApi } from '../services/api'
 import { DenseCards, DenseGrid, DenseMetricCard, DenseSection } from '../components/dense/CyberUi'
 import type { RagStatus } from '../components/dense/CyberUi'
+import { buildSidecarCards } from '../features/observability'
 
 type ApiData = Record<string, unknown>
 
@@ -282,27 +283,7 @@ function Attestation() {
     importance: `scan ${asset.scan_present ? 'present' : 'missing'} | sbom ${asset.sbom_present ? 'present' : 'missing'}`,
   })), [security?.assets])
 
-  const sidecarCards = useMemo<CardItem[]>(() => Object.entries(sidecars).map(([name, payload]) => {
-    const value = payload?.available ? 'ONLINE' : 'OFFLINE'
-    const keyMetric = payload?.status
-      || payload?.version
-      || payload?.up
-      || payload?.num_backends
-      || payload?.containers_running
-      || payload?.go_goroutines
-      || payload?.db_age_hours
-      || '-'
-
-    return {
-      key: `sidecar-${name}`,
-      title: `SIDECAR ${String(name).toUpperCase()}`,
-      value: value as string,
-      hint: `healthy ${payload?.healthy ? 'yes' : 'no'} | metric ${String(keyMetric)}`,
-      status: (payload?.healthy ? 'green' : payload?.available ? 'amber' : 'red') as RagStatus,
-      importance: payload?.available ? 'runtime sidecar telemetry available' : 'sidecar telemetry unavailable',
-      progressPercent: payload?.healthy ? 100 : payload?.available ? 50 : 0,
-    }
-  }), [sidecars])
+  const sidecarCards = useMemo<CardItem[]>(() => buildSidecarCards(sidecars as Record<string, Record<string, unknown>>), [sidecars])
 
   return (
     <Box>

@@ -199,7 +199,7 @@ export function DenseMetricCard({ title, value, hint, status = 'green', importan
         transition: 'background-color 0.25s ease',
       }}
     >
-      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 0.4 }}>
+      <Stack direction="row" sx={{ mb: 0.4, justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Typography
           variant="caption"
           sx={{

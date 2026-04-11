@@ -123,7 +123,7 @@ function Layout() {
         }}
       >
         <Toolbar variant="dense" sx={{ minHeight: '42px !important' }}>
-          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexGrow: 1 }}>
+          <Stack direction="row" spacing={0.75} sx={{ flexGrow: 1, alignItems: 'center' }}>
             <VpnKeyIcon sx={{ fontSize: 18 }} />
             <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 1 }}>NEXUS</Typography>
             <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.62rem' }}>// TRUSTED NODE EXCHANGE HUB</Typography>
@@ -201,7 +201,7 @@ function Layout() {
             transition: 'opacity 160ms ease',
           }}
         >
-          <Stack direction="row" spacing={0.25} justifyContent="space-between" useFlexGap sx={{ minWidth: 0 }}>
+          <Stack direction="row" spacing={0.25} useFlexGap sx={{ minWidth: 0, justifyContent: 'space-between' }}>
             {navItems.map((item) => {
               const active = location.pathname === item.path
               return (
@@ -218,7 +218,7 @@ function Layout() {
                       bgcolor: active ? 'rgba(49,242,125,0.12)' : 'transparent',
                     }}
                   >
-                    <Stack direction="row" spacing={0.35} alignItems="center" sx={{ minWidth: 0 }}>
+                    <Stack direction="row" spacing={0.35} sx={{ minWidth: 0, alignItems: 'center' }}>
                       {item.icon}
                       <Typography variant="caption" sx={{ display: { xs: 'none', sm: 'block' } }}>{item.text}</Typography>
                     </Stack>

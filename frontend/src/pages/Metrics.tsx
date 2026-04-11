@@ -3,6 +3,7 @@ import { Box } from '@mui/material'
 import { clientsApi } from '../services/api'
 import { DenseCards, DenseGrid, DenseMetricCard, DenseSection } from '../components/dense/CyberUi'
 import type { RagStatus } from '../components/dense/CyberUi'
+import { buildSidecarCards, summarizeSidecarRisk } from '../features/observability'
 
 type ApiData = Record<string, unknown>
 
@@ -297,6 +298,15 @@ function Metrics() {
         progressPercent: sidecarCoverage,
       },
       {
+        key: 'sidecar-focus',
+        title: 'SIDECAR FOCUS',
+        value: sidecarCoverage === null ? '-' : `${formatNumber(sidecarCoverage, 0)}%`,
+        hint: summarizeSidecarRisk(sidecars),
+        status: thresholdMinStatus(sidecarCoverage, 80, 100),
+        importance: 'Highest-value sidecar issues to investigate first.',
+        progressPercent: sidecarCoverage,
+      },
+      {
         key: 'process-fd',
         title: 'FD USAGE',
         value: formatPercent(process?.fd_usage_percent, 1),
@@ -356,26 +366,7 @@ function Metrics() {
     importance: probe.url as string,
   })), [sourceProbes])
 
-  const sidecarCards = useMemo<CardItem[]>(() => Object.entries(sidecars).map(([name, payload]) => {
-    const keyMetric = payload?.status
-      || payload?.version
-      || payload?.up
-      || payload?.num_backends
-      || payload?.containers_running
-      || payload?.go_goroutines
-      || payload?.db_age_hours
-      || '-'
-
-    return {
-      key: `sidecar-${name}`,
-      title: `SIDECAR ${String(name).toUpperCase()}`,
-      value: payload?.available ? 'ONLINE' : 'OFFLINE',
-      hint: `metric ${String(keyMetric)} | cache ${formatNumber(payload?.cache_age_seconds, 1)}s/${formatNumber(payload?.cache_ttl_seconds, 1)}s`,
-      status: payload?.available ? 'green' : 'red',
-      progressPercent: payload?.available ? 100 : 0,
-      importance: `cache ${String(payload?.cache_state || '-')}`,
-    }
-  }), [sidecars])
+  const sidecarCards = useMemo<CardItem[]>(() => buildSidecarCards(sidecars as Record<string, Record<string, unknown>>, { includeCache: true }), [sidecars])
 
   const wireguardCards = useMemo<CardItem[]>(() => {
     const wg = wireguard || {}
@@ -514,7 +505,7 @@ function Metrics() {
   }, [caddy, data, env, go, heap, hostOs, process, sidecars, trendHistory])
 
   const runtimeCardKeys = ['cpu', 'memory', 'swap', 'disk', 'api-errors', 'api-latency-p95', 'api-latency-avg', 'service-uptime', 'source-coverage', 'catalog-depth']
-  const processCardKeys = ['process-fd', 'go-runtime', 'upstreams', 'sidecar-health']
+  const processCardKeys = ['process-fd', 'go-runtime', 'upstreams', 'sidecar-health', 'sidecar-focus']
 
   const runtimeCards = primaryCards.filter((card) => runtimeCardKeys.includes(card.key) || card.key === 'state-loading' || card.key === 'state-error')
   const processCards = primaryCards.filter((card) => processCardKeys.includes(card.key))

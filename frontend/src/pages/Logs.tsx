@@ -553,7 +553,7 @@ function Logs() {
               onChange={(event) => setQuery(event.target.value)}
             />
 
-            <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+            <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
               <Chip
                 size="small"
                 label="all"
@@ -576,14 +576,14 @@ function Logs() {
             </Button>
 
             <Typography variant="caption" color="text.secondary">Enabled file sources</Typography>
-            <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+            <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
               {enabledSources.map((source) => (
                 <Chip key={source} size="small" label={source} color="success" />
               ))}
             </Stack>
 
             <Typography variant="caption" color="text.secondary">Sidecar channels</Typography>
-            <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+            <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
               {Object.entries(sidecarState).map(([name, payload]) => (
                 <Chip key={name} size="small" label={`${name}:${payload?.available ? 'up' : 'down'}`} color={payload?.available ? 'success' : 'warning'} />
               ))}

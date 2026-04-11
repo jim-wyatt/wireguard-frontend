@@ -335,7 +335,7 @@ function Nodes() {
             <Typography variant="caption" color="text.secondary">
               Use row action icons to download config, toggle status, or delete a node.
             </Typography>
-            <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+            <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
               <Chip size="small" label={`records:${totalNodes}`} color="default" />
               <Chip size="small" label={`active:${activeNodes}`} color="success" />
               <Chip size="small" label={`downloaded:${downloadedCount}`} color="info" />

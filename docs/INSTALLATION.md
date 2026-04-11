@@ -1,195 +1,122 @@
 # Installation Guide
 
-## Prerequisites
+## Host Prerequisites
 
-- Ubuntu/Debian Linux server with root access
-- Domain name pointing to your server
-- Ports 80, 443 (TCP and UDP) accessible
+- Linux host (Ubuntu/Debian recommended)
+- Domain DNS pointed at host
+- Open ports: TCP 80/443, UDP 443
+- Root or sudo access
+- Podman and podman-compose
 
-## Installation Steps
+Install runtime tools:
 
-### 1. Install WireGuard
+```bash
+sudo apt update
+sudo apt install -y podman podman-compose wireguard wireguard-tools
+```
+
+## 1. WireGuard Host Setup
 
 ```bash
 sudo chmod +x scripts/setup-wireguard.sh
 sudo ./scripts/setup-wireguard.sh
 ```
 
-This will:
-- Install WireGuard
-- Generate server keys
-- Create WireGuard configuration
-- Enable IP forwarding
-- Configure firewall rules
+Record generated keys and confirm interface health:
 
-Save the generated keys for the next step.
+```bash
+sudo wg show
+```
 
-### 2. Configure Environment
+## 2. Environment Configuration
 
 ```bash
 cp .env.example .env
 nano .env
 ```
 
-Update the following values:
-- `DOMAIN`: Your domain name
-- `DATABASE_URL`: Your system PostgreSQL URL (example: `postgresql://user:password@127.0.0.1:5432/wireguard`)
-- `WG_SERVER_PUBLIC_KEY`: From step 1
-- `WG_SERVER_PRIVATE_KEY`: From step 1
-- `WG_SERVER_ENDPOINT`: Your domain:443
-- `API_SECRET_KEY`: Generate with `openssl rand -hex 32`
-- `API_AUTH_TOKEN`: Generate with `openssl rand -hex 32`
+Required:
 
-### 3. Install Podman and Podman Compose
+- DOMAIN
+- WG_SERVER_PUBLIC_KEY
+- WG_SERVER_PRIVATE_KEY
+- WG_SERVER_ENDPOINT
+- API_SECRET_KEY
+
+Auth:
+
+- Preferred: API_AUTH_TOKENS_JSON (scoped writer/public grants)
+- Legacy: API_AUTH_TOKEN
+
+Database:
+
+- Leave DATABASE_URL empty to let deploy script derive PostgreSQL URL from POSTGRES_* values.
+
+## 3. Deploy Production Stack
 
 ```bash
-# Install Podman and compose wrapper
-sudo apt update
-sudo apt install -y podman podman-compose
+make prod-up
 ```
 
-### 4. Deploy Application
+What this does:
 
-For development:
+- Builds frontend assets
+- Builds backend image
+- Starts production compose services
+- Restarts backend to ensure latest build is active
+
+Enable full security sidecars:
+
 ```bash
-chmod +x scripts/dev-setup.sh
-./scripts/dev-setup.sh
-podman compose up -d
+ENABLE_SECURITY_SIDECARS=true make prod-up
 ```
 
-The development setup script automatically installs `nvm` (if missing) and the latest Node LTS before running frontend `npm` commands.
+## 4. Verify
 
-For production:
 ```bash
-chmod +x scripts/deploy-prod.sh
-./scripts/deploy-prod.sh
+sudo podman ps
+curl http://127.0.0.1:8000/health
+curl -k https://$DOMAIN/api/nodes/stats
 ```
 
-The production deployment script also ensures `nvm` + latest Node LTS are installed before building the frontend.
+## 5. Operate
 
-### 5. Verify Installation
-
-Check that all services are running:
 ```bash
-podman compose ps
+# Rebuild only
+make prod-build
+
+# Stop stack
+make prod-down
+
+# Tail logs
+sudo podman-compose -f compose.prod.yml logs -f
 ```
-
-Check WireGuard status:
-```bash
-sudo wg show
-```
-
-Access the application:
-- Open your browser to `https://your-domain.com`
-
-## Post-Installation
-
-### Create First Client
-
-1. Navigate to the "Clients" page
-2. Click "Create Client"
-3. Enter an email address
-4. Download the configuration or scan the QR code
-5. Import the configuration into your WireGuard client
-
-### Monitor Connections
-
-- View connected clients on the Dashboard
-- Check real-time statistics
-- Monitor data transfer
 
 ## Troubleshooting
 
-### WireGuard not starting
+WireGuard:
 
 ```bash
+sudo wg show
 sudo systemctl status wg-quick@wg0
-sudo journalctl -u wg-quick@wg0 -n 50
 ```
 
-### Backend cannot access WireGuard
-
-Ensure the backend container has proper permissions:
-```bash
-podman compose logs backend
-```
-
-The backend runs in a container but mutates host WireGuard via:
-- host network mode
-- `NET_ADMIN` capability
-- bind mount to `/etc/wireguard`
-
-This keeps the VPN endpoint on the host kernel/interface while the app itself stays containerized.
-
-### Database connection issues
-
-Verify DATABASE_URL in .env matches your configuration.
-
-If you use system PostgreSQL, check service status/logs:
-```bash
-sudo systemctl status postgresql
-sudo journalctl -u postgresql -n 50
-```
-
-### Caddy HTTPS issues
-
-Ensure:
-- Port 80 and 443 are open
-- Domain DNS is correctly configured
-- Email in Caddyfile is valid
-
-Traffic model:
-- Caddy handles web traffic on TCP 443.
-- WireGuard handles VPN traffic directly on UDP 443 at the host level.
-- Caddy does not proxy WireGuard UDP packets in this setup.
-
-Check Caddy logs:
-```bash
-podman compose logs caddy
-```
-
-## Updating
+Backend:
 
 ```bash
-git pull
-podman compose down
-podman compose up -d --build
+curl http://127.0.0.1:8000/health
+sudo podman logs --tail 200 wg_backend_1
 ```
 
-## Backup
-
-### Database Backup
+Caddy/TLS:
 
 ```bash
-podman compose exec db pg_dump -U wireguard wireguard > backup.sql
+sudo podman logs --tail 200 wg_caddy_1
 ```
 
-### WireGuard Configuration Backup
+## Security Notes
 
-```bash
-sudo cp -r /etc/wireguard /root/wireguard-backup-$(date +%Y%m%d)
-```
-
-## Security Recommendations
-
-1. Change default passwords in `.env`
-2. Keep system and Podman images updated
-3. Enable automatic security updates
-4. Use strong API secret keys
-5. Regularly review connected clients
-6. Monitor logs for suspicious activity
-7. Consider implementing rate limiting
-8. Use fail2ban for additional protection
-9. Never embed `API_AUTH_TOKEN` in frontend build variables
-10. For admin browser sessions, set a temporary token at runtime:
-
-```js
-localStorage.setItem('apiToken', '<API_AUTH_TOKEN>')
-```
-
-## Support
-
-For issues and questions:
-- Check logs: `podman compose logs`
-- Review WireGuard status: `sudo wg show`
-- Check firewall rules: `sudo ufw status`
+- Keep auth tokens out of frontend build variables.
+- Use short-lived scoped tokens where possible.
+- Rotate credentials in `.env` periodically.
+- Keep host packages and container images updated.

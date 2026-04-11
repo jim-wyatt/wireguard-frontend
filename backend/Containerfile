@@ -1,4 +1,4 @@
-FROM docker.io/library/python:3.12.13-slim-trixie
+FROM docker.io/library/python:3.14.4-slim-trixie
 
 WORKDIR /app
 

@@ -1,185 +1,100 @@
-# Quick Start Guide
+# Quick Start
 
-Get your WireGuard management system up and running in minutes!
+This guide gets you running quickly in either development or production mode.
 
-## 🚀 Fast Track (Development)
+## Development (Local)
 
 ```bash
-# 1. Clone and navigate to project
 cd wireguard-frontend
-
-# 2. Setup development environment
-make dev-setup
-
-# 3. Configure environment
 cp .env.example .env
-# Edit .env with your settings (use dummy values for testing)
-
-# 4. Start services
+make dev-setup
 make dev-up
-
-# 5. Access the application
-# Frontend: http://localhost:5173
-# API Docs: http://localhost:8000/docs
 ```
 
-## 🌐 Production Deployment
+Access:
 
-### Prerequisites
-- Ubuntu/Debian server
-- Domain name pointed to your server
-- Root access
+- UI: http://localhost:5173
+- API docs: http://localhost:8000/docs
 
-### Steps
+Stop:
 
 ```bash
-# 1. Install WireGuard
-make setup-wireguard
-# Save the keys shown at the end
+make dev-down
+```
 
-# 2. Configure environment
+## Production (Host)
+
+Prerequisites:
+
+- Linux host with root privileges
+- Domain mapped to host
+- Podman and podman-compose installed
+- WireGuard configured on host
+
+Minimal flow:
+
+```bash
+cd wireguard-frontend
 cp .env.example .env
 nano .env
-# Set all required values
-
-# 3. Install Podman
-sudo apt update
-sudo apt install -y podman podman-compose
-
-# 4. Deploy
 make prod-up
-
-# 5. Access
-# https://your-domain.com
 ```
 
-## 📱 Create Your First Client
+The deploy script validates required variables and builds frontend/backend artifacts.
 
-1. Open the web interface
-2. Navigate to "Clients" page
-3. Click "Create Client"
-4. Enter email address
-5. Click on the download icon to get the config
-6. Scan QR code with WireGuard mobile app or download .conf file
+## Required .env Values
 
-## 🔧 Essential Commands
+- DOMAIN
+- WG_SERVER_PUBLIC_KEY
+- WG_SERVER_PRIVATE_KEY
+- WG_SERVER_ENDPOINT
+- API_SECRET_KEY
+
+Recommended:
+
+- API_AUTH_TOKENS_JSON for scoped token grants
+- API_AUTH_TOKEN only for backward compatibility
+
+## Verify Health
 
 ```bash
-# View logs
-make logs
-
-# Check status
-make status
-
-# Stop services
-make dev-down  # or prod-down
-
-# Backup database
-make backup-db
-
-# Backup WireGuard config
-make backup-wg
+curl http://127.0.0.1:8000/health
+curl -k https://$DOMAIN/api/nodes/stats
+sudo podman ps
 ```
 
-## 📊 Monitoring
+## Common Operations
 
-### Check Connected Clients
-- View Dashboard in web interface
-- Updates every 10 seconds automatically
-
-### Command Line
 ```bash
-# View WireGuard status
+# Build only
+make prod-build
+
+# Stop production stack
+make prod-down
+
+# Run tests
+make test
+
+# Smoke test API (uses .env)
+make smoke
+```
+
+## Troubleshooting
+
+```bash
+# Compose logs
+sudo podman-compose -f compose.prod.yml logs -f
+
+# WireGuard runtime
 sudo wg show
 
-# View specific interface
-sudo wg show wg0
-
-# View service logs
-make logs-backend
-make logs-frontend
+# Backend health
+curl http://127.0.0.1:8000/health
 ```
 
-## 🔐 Security Checklist
+## Next Docs
 
-Before going to production:
-
-- [ ] Change all default passwords in `.env`
-- [ ] Set strong `API_SECRET_KEY` (use `openssl rand -hex 32`)
-- [ ] Configure firewall (ufw)
-- [ ] Set up proper domain with HTTPS
-- [ ] Review and limit CORS origins
-- [ ] Enable automatic updates
-- [ ] Set up monitoring
-- [ ] Configure backups
-- [ ] Review WireGuard server configuration
-
-## 🐛 Troubleshooting
-
-### Services won't start
-```bash
-# Check Podman Compose
-podman compose ps
-podman compose logs
-
-# Check WireGuard
-sudo systemctl status wg-quick@wg0
-sudo wg show
-```
-
-### Can't create clients
-```bash
-# Check backend logs
-make logs-backend
-
-# Verify WireGuard is running
-sudo wg show wg0
-
-# Check permissions
-ls -la /etc/wireguard/
-```
-
-### Frontend can't connect to backend
-```bash
-# Check CORS settings in backend/.env
-# Verify API is responding
-curl http://localhost:8000/health
-
-# Check network
-podman network ls
-```
-
-## 📚 Next Steps
-
-- Read [INSTALLATION.md](docs/INSTALLATION.md) for detailed setup
-- Check [API.md](docs/API.md) for API documentation
-- See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for development guide
-- Review [README.md](README.md) for complete overview
-
-## 💡 Tips
-
-1. **Testing**: Use SQLite for development, PostgreSQL for production
-2. **Logs**: Always check logs when troubleshooting
-3. **Backups**: Run regular backups (make backup-db, make backup-wg)
-4. **Updates**: Keep Podman images and system packages updated
-5. **Security**: Never commit .env files to version control
-
-## 🆘 Getting Help
-
-1. Check the logs: `make logs`
-2. Review documentation in `docs/`
-3. Verify .env configuration
-4. Check WireGuard status: `sudo wg show`
-5. Test API: http://localhost:8000/docs
-
-## 📈 Performance Tips
-
-- Use PostgreSQL for production (better than SQLite)
-- Enable Caddy caching for static assets
-- Monitor disk space for database growth
-- Regularly clean up inactive clients
-- Use monitoring tools (Prometheus/Grafana)
-
----
-
-Happy VPN managing! 🎉
+- [README.md](README.md)
+- [docs/INSTALLATION.md](docs/INSTALLATION.md)
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- [docs/API.md](docs/API.md)

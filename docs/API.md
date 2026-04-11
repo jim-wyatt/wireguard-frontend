@@ -1,276 +1,139 @@
 # API Documentation
 
-## Base URL
+## Base URLs
 
-```
-http://localhost:8000/api
-```
+- Direct backend: http://localhost:8000
+- Through Caddy (production): https://<DOMAIN>
 
-## Endpoints
+All application routes are under `/api` except root and health endpoints.
 
-### Health Check
+## OpenAPI
 
-#### GET /health
-Check if the API is running.
+When enabled, interactive docs are available at:
 
-**Response:**
-```json
-{
-  "status": "healthy"
-}
-```
+- `/docs`
+- `/openapi.json`
 
----
+## Authentication Model
 
-### Client Management
+Credentials can be provided via either header:
 
-#### POST /api/nodes
-Create a new WireGuard client.
+- `Authorization: Bearer <token>`
+- `X-API-Key: <token>`
 
-**Request Body:**
+Supported token modes:
+
+- Legacy single token: `API_AUTH_TOKEN`
+- Scoped token grants: `API_AUTH_TOKENS_JSON`
+
+Roles:
+
+- `public`: read-only authenticated access
+- `writer`: mutating access
+
+## Route Groups
+
+### Public (No Auth Required)
+
+- `GET /`
+- `GET /health`
+- `GET /api/nodes/stats`
+- `GET /api/logs/stream`
+- `GET /api/logs/caddy/access/stream`
+- `GET /api/metrics/summary`
+- `GET /api/attestation/summary`
+
+### Auth Required (Public or Writer Role)
+
+- `GET /api/nodes`
+- `GET /api/nodes/connected`
+- `GET /api/nodes/{client_id}`
+- `GET /api/debug/top/snapshot`
+- `GET /api/debug/btop/snapshot`
+
+### Writer Role Required
+
+- `POST /api/nodes`
+- `GET /api/nodes/{client_id}/config`
+- `PATCH /api/nodes/{client_id}/toggle`
+- `DELETE /api/nodes/{client_id}`
+
+## Legacy Compatibility Routes
+
+`/api/clients*` routes are supported and redirect to canonical `/api/nodes*` routes.
+
+## Node Endpoints
+
+### Create Node
+
+- `POST /api/nodes`
+- Body:
+
 ```json
 {
   "email": "user@example.com",
-  "name": "John Doe"  // optional
+  "name": "Optional Name"
 }
 ```
 
-**Response:** `201 Created`
-```json
-{
-  "id": 1,
-  "email": "user@example.com",
-  "name": "John Doe",
-  "ip_address": "10.0.0.2",
-  "public_key": "...",
-  "is_active": true,
-  "created_at": "2024-03-07T10:00:00Z",
-  "last_handshake": null,
-  "config_downloaded": false
-}
-```
+### List Nodes
 
-**Error Responses:**
-- `400`: Email already registered
-- `500`: Failed to generate keys or allocate IP
+- `GET /api/nodes?skip=0&limit=100&active_only=false`
 
----
+### Node Stats
 
-#### GET /api/nodes
-List all clients.
+- `GET /api/nodes/stats`
 
-**Query Parameters:**
-- `skip` (int): Number of records to skip (default: 0)
-- `limit` (int): Maximum number of records (default: 100)
-- `active_only` (bool): Only return active clients (default: false)
+### Connected Nodes
 
-**Response:** `200 OK`
-```json
-[
-  {
-    "id": 1,
-    "email": "user@example.com",
-    "name": "John Doe",
-    "ip_address": "10.0.0.2",
-    "public_key": "...",
-    "is_active": true,
-    "created_at": "2024-03-07T10:00:00Z",
-    "last_handshake": "2024-03-07T11:30:00Z",
-    "config_downloaded": true
-  }
-]
-```
+- `GET /api/nodes/connected`
 
----
+### Node Detail
 
-#### GET /api/nodes/stats
-Get client statistics.
+- `GET /api/nodes/{client_id}`
 
-**Response:** `200 OK`
-```json
-{
-  "total_clients": 10,
-  "active_clients": 8,
-  "connected_clients": 3
-}
-```
+### Node Config + QR
 
----
+- `GET /api/nodes/{client_id}/config`
 
-#### GET /api/nodes/connected
-Get list of currently connected clients.
+### Toggle Node Active State
 
-**Response:** `200 OK`
-```json
-[
-  {
-    "id": 1,
-    "email": "user@example.com",
-    "name": "John Doe",
-    "ip_address": "10.0.0.2",
-    "last_handshake": "2024-03-07T11:30:00Z",
-    "transfer_rx": 1048576,
-    "transfer_tx": 2097152
-  }
-]
-```
+- `PATCH /api/nodes/{client_id}/toggle`
 
----
+### Delete Node
 
-#### GET /api/nodes/{client_id}
-Get details of a specific client.
+- `DELETE /api/nodes/{client_id}`
 
-**Response:** `200 OK`
-```json
-{
-  "id": 1,
-  "email": "user@example.com",
-  "name": "John Doe",
-  "ip_address": "10.0.0.2",
-  "public_key": "...",
-  "is_active": true,
-  "created_at": "2024-03-07T10:00:00Z",
-  "last_handshake": "2024-03-07T11:30:00Z",
-  "config_downloaded": true
-}
-```
+## Observability Endpoints
 
-**Error Responses:**
-- `404`: Client not found
+- `GET /api/metrics/summary`
+- `GET /api/attestation/summary`
+- `GET /api/logs/stream`
+- `GET /api/logs/caddy/access/stream`
+- `GET /api/debug/top/snapshot`
+- `GET /api/debug/btop/snapshot`
 
----
+## Error Shape
 
-#### GET /api/nodes/{client_id}/config
-Get client configuration file and QR code.
-
-**Response:** `200 OK`
-```json
-{
-  "config": "[Interface]\nPrivateKey = ...\n...",
-  "qr_code": "data:image/png;base64,..."
-}
-```
-
-**Error Responses:**
-- `404`: Client not found
-
----
-
-#### PATCH /api/nodes/{client_id}/toggle
-Toggle client active status (enable/disable).
-
-**Response:** `200 OK`
-```json
-{
-  "id": 1,
-  "email": "user@example.com",
-  "name": "John Doe",
-  "ip_address": "10.0.0.2",
-  "public_key": "...",
-  "is_active": false,
-  "created_at": "2024-03-07T10:00:00Z",
-  "last_handshake": "2024-03-07T11:30:00Z",
-  "config_downloaded": true
-}
-```
-
-**Error Responses:**
-- `404`: Client not found
-
----
-
-#### DELETE /api/nodes/{client_id}
-Delete a client.
-
-**Response:** `204 No Content`
-
-**Error Responses:**
-- `404`: Client not found
-
----
-
-## Data Models
-
-### Client
-
-```typescript
-{
-  id: number;
-  email: string;
-  name: string | null;
-  ip_address: string;
-  public_key: string;
-  is_active: boolean;
-  created_at: string; // ISO 8601 datetime
-  last_handshake: string | null; // ISO 8601 datetime
-  config_downloaded: boolean;
-}
-```
-
-### ClientCreate
-
-```typescript
-{
-  email: string; // valid email address
-  name?: string; // optional
-}
-```
-
-### ClientStats
-
-```typescript
-{
-  total_clients: number;
-  active_clients: number;
-  connected_clients: number;
-}
-```
-
-### ClientConnected
-
-```typescript
-{
-  id: number;
-  email: string;
-  name: string | null;
-  ip_address: string;
-  last_handshake: string; // ISO 8601 datetime
-  transfer_rx: number; // bytes received
-  transfer_tx: number; // bytes transmitted
-}
-```
-
----
-
-## Error Handling
-
-All errors follow this format:
+Errors follow FastAPI conventions:
 
 ```json
 {
-  "detail": "Error message description"
+  "detail": "Error message"
 }
 ```
 
-Common HTTP status codes:
-- `200`: Success
-- `201`: Created
-- `204`: No Content (successful deletion)
-- `400`: Bad Request (validation error)
-- `404`: Not Found
-- `500`: Internal Server Error
+Common statuses:
 
----
+- `400` validation/business rule error
+- `401` missing/invalid credentials
+- `403` insufficient role
+- `404` resource not found
+- `429` auth failure lockout or endpoint rate-limit
+- `500` internal server error
 
-## Rate Limiting
+## Notes for UI Consumers
 
-Consider implementing rate limiting in production to prevent abuse, especially for client creation endpoints.
-
-## Authentication
-
-The current version does not include authentication. For production use, implement:
-- JWT tokens
-- API keys
-- OAuth2
-
-Add authentication middleware to protect endpoints.
+- Public dashboard-style endpoints can be called without credentials.
+- Mutating routes require writer credentials.
+- Admin browser sessions should inject token at runtime, not build time.

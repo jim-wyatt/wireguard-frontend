@@ -1,4 +1,4 @@
-FROM docker.io/library/node:22.22.2-alpine3.23@sha256:1e8b5d68cac394f76c931b266fe5c224c3fe4cdbc33131e064c83b88235fe77e as builder
+FROM docker.io/library/node:25.9.0-alpine3.23@sha256:0a3c29db9e679c476d11a2bff0d31e2f8550664e44035350df7efba306fc707e as builder
 
 WORKDIR /app
 
