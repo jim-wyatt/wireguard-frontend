@@ -34,7 +34,7 @@ services:
     network_mode: "host"
 
   node_exporter:
-    image: quay.io/prometheus/node-exporter:v1.9.1
+    image: quay.io/prometheus/node-exporter:v1.11.1
     command:
       - --path.rootfs=/host
       - --web.listen-address=127.0.0.1:9100
@@ -49,7 +49,7 @@ services:
     network_mode: "host"
 
   podman_exporter:
-    image: quay.io/navidys/prometheus-podman-exporter:latest
+    image: quay.io/navidys/prometheus-podman-exporter:v1.21.0
     user: "0:0"
     command:
       - --web.listen-address=127.0.0.1:9882
@@ -71,7 +71,7 @@ services:
     network_mode: "host"
 
   postgres_exporter:
-    image: quay.io/prometheuscommunity/postgres-exporter:v0.16.0
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.19.1
     environment:
       DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-wireguard}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB:-wireguard}?sslmode=disable
     command:
@@ -87,7 +87,7 @@ services:
     network_mode: "host"
 
   falco:
-    image: docker.io/falcosecurity/falco-no-driver:latest
+    image: docker.io/falcosecurity/falco-no-driver:0.39.2
     command:
       - /usr/bin/falco
       - --dry-run
@@ -113,7 +113,7 @@ services:
     network_mode: "host"
 
   falcosidekick:
-    image: docker.io/falcosecurity/falcosidekick:2.29.0
+    image: docker.io/falcosecurity/falcosidekick:2.33.0
     environment:
       LISTENPORT: 2801
       PROMETHEUSMETRICS: "true"
@@ -128,7 +128,7 @@ services:
     network_mode: "host"
 
   crowdsec:
-    image: docker.io/crowdsecurity/crowdsec:v1.6.3
+    image: docker.io/crowdsecurity/crowdsec:v1.7.7
     environment:
       COLLECTIONS: crowdsecurity/linux crowdsecurity/sshd
       DISABLE_ONLINE_API: "true"
@@ -146,7 +146,7 @@ services:
     network_mode: "host"
 
   trivy_server:
-    image: docker.io/aquasec/trivy:0.62.1
+    image: docker.io/aquasec/trivy:0.69.3
     command:
       - server
       - --listen
@@ -165,7 +165,7 @@ services:
     network_mode: "host"
 
   parca:
-    image: ghcr.io/parca-dev/parca:v0.24.0
+    image: ghcr.io/parca-dev/parca:v0.27.1
     command:
       - /parca
       - --http-address=127.0.0.1:7070
@@ -181,7 +181,7 @@ services:
     network_mode: "host"
 
   ebpf_agent:
-    image: ghcr.io/parca-dev/parca-agent:latest
+    image: ghcr.io/parca-dev/parca-agent:v0.47.0
     command:
       - --http-address=127.0.0.1:9435
       - --log-level=info

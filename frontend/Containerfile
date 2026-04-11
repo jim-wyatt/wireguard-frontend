@@ -9,7 +9,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM docker.io/library/nginx:1.28.3-alpine3.23@sha256:0dcc88822d45581e65ae329f8be769762bf628d3b2bb7d2a077d4aa5c98b30e3
+FROM docker.io/library/nginx:1.29.8-alpine3.23@sha256:582c496ccf79d8aa6f8203a79d32aaf7ffd8b13362c60a701a2f9ac64886c93d
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
