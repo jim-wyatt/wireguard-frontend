@@ -8,15 +8,15 @@ import {
   Button,
   Alert,
 } from '@mui/material'
-import { clientsApi } from '../services/api'
+import { peersApi } from '../services/api'
 
-interface CreateNodeDialogProps {
+interface CreatePeerDialogProps {
   open: boolean
   onClose: () => void
   onSuccess: () => void
 }
 
-function CreateNodeDialog({ open, onClose, onSuccess }: CreateNodeDialogProps) {
+function CreatePeerDialog({ open, onClose, onSuccess }: CreatePeerDialogProps) {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
@@ -36,12 +36,12 @@ function CreateNodeDialog({ open, onClose, onSuccess }: CreateNodeDialogProps) {
     setError(null)
 
     try {
-      await clientsApi.createClient({ email, name: name || undefined })
+      await peersApi.createPeer({ email, name: name || undefined })
       onSuccess()
       onClose()
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: string } } }
-      setError(axiosErr.response?.data?.detail || 'Failed to create node')
+      setError(axiosErr.response?.data?.detail || 'Failed to create peer')
     } finally {
       setLoading(false)
     }
@@ -50,7 +50,7 @@ function CreateNodeDialog({ open, onClose, onSuccess }: CreateNodeDialogProps) {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <form onSubmit={handleSubmit}>
-        <DialogTitle>Create New Node</DialogTitle>
+        <DialogTitle>Create New Peer</DialogTitle>
         <DialogContent>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -82,7 +82,7 @@ function CreateNodeDialog({ open, onClose, onSuccess }: CreateNodeDialogProps) {
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>
           <Button type="submit" variant="contained" disabled={loading}>
-            {loading ? 'Creating...' : 'Create Node'}
+            {loading ? 'Creating...' : 'Create Peer'}
           </Button>
         </DialogActions>
       </form>
@@ -90,4 +90,4 @@ function CreateNodeDialog({ open, onClose, onSuccess }: CreateNodeDialogProps) {
   )
 }
 
-export default CreateNodeDialog
+export default CreatePeerDialog

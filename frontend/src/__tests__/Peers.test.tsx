@@ -1,12 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import Nodes from '../pages/Nodes'
-import { clientsApi } from '../services/api'
+import Peers from '../pages/Peers'
+import { peersApi } from '../services/api'
 
 vi.mock('../services/api', () => ({
-  clientsApi: {
-    getClients: vi.fn(),
-    deleteClient: vi.fn(),
-    toggleClientStatus: vi.fn(),
+  peersApi: {
+    getPeers: vi.fn(),
+    deletePeer: vi.fn(),
+    togglePeerStatus: vi.fn(),
   },
 }))
 
@@ -14,14 +14,14 @@ vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({ isAuthenticated: true }),
 }))
 
-vi.mock('../components/CreateNodeDialog', () => ({
+vi.mock('../components/CreatePeerDialog', () => ({
   default: ({ open }: { open: boolean }) =>
     open ? <div data-testid="create-client-dialog">Create Dialog</div> : null,
 }))
 
-vi.mock('../components/NodeConfigDialog', () => ({
-  default: ({ open, nodeEmail }: { open: boolean; nodeEmail?: string }) =>
-    open ? <div data-testid="client-config-dialog">Config Dialog {nodeEmail}</div> : null,
+vi.mock('../components/PeerConfigDialog', () => ({
+  default: ({ open, peerEmail }: { open: boolean; peerEmail?: string }) =>
+    open ? <div data-testid="client-config-dialog">Config Dialog {peerEmail}</div> : null,
 }))
 
 vi.mock('@mui/x-data-grid', () => ({
@@ -45,20 +45,20 @@ vi.mock('@mui/x-data-grid', () => ({
   },
 }))
 
-const mockedClientsApi = clientsApi as unknown as {
-  getClients: ReturnType<typeof vi.fn>
-  deleteClient: ReturnType<typeof vi.fn>
-  toggleClientStatus: ReturnType<typeof vi.fn>
+const mockedPeersApi = peersApi as unknown as {
+  getPeers: ReturnType<typeof vi.fn>
+  deletePeer: ReturnType<typeof vi.fn>
+  togglePeerStatus: ReturnType<typeof vi.fn>
 }
 
-describe('Nodes page', () => {
+describe('Peers page', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubGlobal('confirm', vi.fn(() => true))
   })
 
-  it('loads nodes on mount and renders row data', async () => {
-    mockedClientsApi.getClients.mockResolvedValue({
+  it('loads peers on mount and renders row data', async () => {
+    mockedPeersApi.getPeers.mockResolvedValue({
       data: [
         {
           id: 1,
@@ -72,18 +72,18 @@ describe('Nodes page', () => {
       ],
     })
 
-    render(<Nodes />)
+    render(<Peers />)
 
     await waitFor(() => {
-      expect(mockedClientsApi.getClients).toHaveBeenCalledTimes(1)
+      expect(mockedPeersApi.getPeers).toHaveBeenCalledTimes(1)
     })
 
     expect(await screen.findByText('alice@example.com')).toBeInTheDocument()
     expect(screen.getByText('Rows: 1')).toBeInTheDocument()
   })
 
-  it('deletes a node and shows success message', async () => {
-    mockedClientsApi.getClients.mockResolvedValue({
+  it('deletes a peer and shows success message', async () => {
+    mockedPeersApi.getPeers.mockResolvedValue({
       data: [
         {
           id: 1,
@@ -96,23 +96,23 @@ describe('Nodes page', () => {
         },
       ],
     })
-    mockedClientsApi.deleteClient.mockResolvedValue({})
+    mockedPeersApi.deletePeer.mockResolvedValue({})
 
-    render(<Nodes />)
+    render(<Peers />)
 
     await screen.findByText('alice@example.com')
 
     fireEvent.click(screen.getByTitle('Delete'))
 
     await waitFor(() => {
-      expect(mockedClientsApi.deleteClient).toHaveBeenCalledWith(1)
+      expect(mockedPeersApi.deletePeer).toHaveBeenCalledWith(1)
     })
 
-    expect(await screen.findByText('Node deleted successfully')).toBeInTheDocument()
+    expect(await screen.findByText('Peer deleted successfully')).toBeInTheDocument()
   })
 
-  it('toggles a node and shows status message', async () => {
-    mockedClientsApi.getClients.mockResolvedValue({
+  it('toggles a peer and shows status message', async () => {
+    mockedPeersApi.getPeers.mockResolvedValue({
       data: [
         {
           id: 1,
@@ -125,23 +125,23 @@ describe('Nodes page', () => {
         },
       ],
     })
-    mockedClientsApi.toggleClientStatus.mockResolvedValue({})
+    mockedPeersApi.togglePeerStatus.mockResolvedValue({})
 
-    render(<Nodes />)
+    render(<Peers />)
 
     await screen.findByText('alice@example.com')
 
     fireEvent.click(screen.getByTitle('Deactivate'))
 
     await waitFor(() => {
-      expect(mockedClientsApi.toggleClientStatus).toHaveBeenCalledWith(1)
+      expect(mockedPeersApi.togglePeerStatus).toHaveBeenCalledWith(1)
     })
 
-    expect(await screen.findByText('Node status updated')).toBeInTheDocument()
+    expect(await screen.findByText('Peer status updated')).toBeInTheDocument()
   })
 
   it('opens create and config dialogs', async () => {
-    mockedClientsApi.getClients.mockResolvedValue({
+    mockedPeersApi.getPeers.mockResolvedValue({
       data: [
         {
           id: 1,
@@ -155,14 +155,14 @@ describe('Nodes page', () => {
       ],
     })
 
-    render(<Nodes />)
+    render(<Peers />)
 
     await screen.findByText('alice@example.com')
 
-    fireEvent.click(screen.getByText('Create Node'))
+    fireEvent.click(screen.getByText('Create Peer'))
     expect(screen.getByTestId('create-client-dialog')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByTitle('Download Node Config'))
+    fireEvent.click(screen.getByTitle('Download Peer Config'))
     expect(screen.getByTestId('client-config-dialog')).toHaveTextContent('alice@example.com')
   })
 })

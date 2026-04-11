@@ -41,7 +41,7 @@ function Login() {
         return
       }
 
-      const response = await fetch('/api/nodes?limit=1', {
+      const response = await fetch('/api/peers?limit=1', {
         headers: {
           Authorization: `Bearer ${token.trim()}`,
         },
@@ -81,7 +81,7 @@ function Login() {
       key: 'auth-check',
       title: 'VALIDATION',
       value: 'LIVE API CHECK',
-      hint: 'token is verified against /api/nodes before session starts',
+      hint: 'token is verified against /api/peers before session starts',
       status: 'amber',
       importance: 'Prevents saving unusable credentials in browser state.',
     },
@@ -97,7 +97,7 @@ function Login() {
       key: 'auth-purpose',
       title: 'MISSION',
       value: 'TRUSTED EXCHANGE HUB',
-      hint: 'controlled access to nodes, logs, trust and operations telemetry',
+      hint: 'controlled access to peers, logs, trust and operations telemetry',
       status: 'green',
       importance: 'Authentication keeps the operator HUD trustworthy and auditable.',
     },

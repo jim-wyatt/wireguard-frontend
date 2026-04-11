@@ -15,14 +15,14 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import DownloadIcon from '@mui/icons-material/Download'
 import ToggleOffIcon from '@mui/icons-material/ToggleOff'
 import ToggleOnIcon from '@mui/icons-material/ToggleOn'
-import CreateNodeDialog from '../components/CreateNodeDialog'
-import NodeConfigDialog from '../components/NodeConfigDialog'
-import { clientsApi } from '../services/api'
+import CreatePeerDialog from '../components/CreatePeerDialog'
+import PeerConfigDialog from '../components/PeerConfigDialog'
+import { peersApi } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { DenseCards, DenseGrid, DenseMetricCard, DenseSection } from '../components/dense/CyberUi'
 import type { RagStatus } from '../components/dense/CyberUi'
 
-interface Node {
+interface Peer {
   id: number
   email: string
   name?: string
@@ -47,80 +47,80 @@ interface SnackbarState {
   severity: 'success' | 'error' | 'warning' | 'info'
 }
 
-function Nodes() {
+function Peers() {
   const { isAuthenticated } = useAuth()
-  const [clients, setClients] = useState<Node[]>([])
+  const [peers, setPeers] = useState<Peer[]>([])
   const [loading, setLoading] = useState(true)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [configDialogOpen, setConfigDialogOpen] = useState(false)
-  const [selectedNode, setSelectedNode] = useState<Node | null>(null)
+  const [selectedPeer, setSelectedPeer] = useState<Peer | null>(null)
   const [snackbar, setSnackbar] = useState<SnackbarState>({ open: false, message: '', severity: 'success' })
 
-  const loadClients = useCallback(async () => {
+  const loadPeers = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await clientsApi.getClients()
-      setClients(response.data as Node[])
+      const response = await peersApi.getPeers()
+      setPeers(response.data as Peer[])
     } catch {
-      showSnackbar('Failed to load nodes', 'error')
+      showSnackbar('Failed to load peers', 'error')
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    loadClients()
-  }, [loadClients])
+    loadPeers()
+  }, [loadPeers])
 
   const showSnackbar = (message: string, severity: SnackbarState['severity'] = 'success') => {
     setSnackbar({ open: true, message, severity })
   }
 
   const handleCreateSuccess = () => {
-    loadClients()
-    showSnackbar('Node created successfully')
+    loadPeers()
+    showSnackbar('Peer created successfully')
   }
 
   const handleDelete = async (id: number) => {
     if (!isAuthenticated) {
-      showSnackbar('Login required for node management actions', 'warning')
+      showSnackbar('Login required for peer management actions', 'warning')
       return
     }
-    if (!confirm('Are you sure you want to delete this node?')) return
+    if (!confirm('Are you sure you want to delete this peer?')) return
 
     try {
-      await clientsApi.deleteClient(id)
-      loadClients()
-      showSnackbar('Node deleted successfully')
+      await peersApi.deletePeer(id)
+      loadPeers()
+      showSnackbar('Peer deleted successfully')
     } catch {
-      showSnackbar('Failed to delete node', 'error')
+      showSnackbar('Failed to delete peer', 'error')
     }
   }
 
   const handleToggle = async (id: number) => {
     if (!isAuthenticated) {
-      showSnackbar('Login required for node management actions', 'warning')
+      showSnackbar('Login required for peer management actions', 'warning')
       return
     }
     try {
-      await clientsApi.toggleClientStatus(id)
-      loadClients()
-      showSnackbar('Node status updated')
+      await peersApi.togglePeerStatus(id)
+      loadPeers()
+      showSnackbar('Peer status updated')
     } catch {
-      showSnackbar('Failed to update node status', 'error')
+      showSnackbar('Failed to update peer status', 'error')
     }
   }
 
-  const handleShowConfig = (node: Node) => {
+  const handleShowConfig = (peer: Peer) => {
     if (!isAuthenticated) {
-      showSnackbar('Login required to download node configuration', 'warning')
+      showSnackbar('Login required to download peer configuration', 'warning')
       return
     }
-    setSelectedNode(node)
+    setSelectedPeer(peer)
     setConfigDialogOpen(true)
   }
 
-  const columns: GridColDef<Node>[] = [
+  const columns: GridColDef<Peer>[] = [
     {
       field: 'email',
       headerName: 'Email',
@@ -132,14 +132,14 @@ function Nodes() {
       headerName: 'Name',
       flex: 0.7,
       minWidth: 150,
-      renderCell: (params: GridRenderCellParams<Node>) => params.row?.name || '-',
+      renderCell: (params: GridRenderCellParams<Peer>) => params.row?.name || '-',
     },
     {
       field: 'ip_address',
       headerName: 'IP Address',
       flex: 0.6,
       minWidth: 130,
-      renderCell: (params: GridRenderCellParams<Node>) => (
+      renderCell: (params: GridRenderCellParams<Peer>) => (
         <Chip label={params.value as string} size="small" />
       ),
     },
@@ -148,7 +148,7 @@ function Nodes() {
       headerName: 'Status',
       flex: 0.5,
       minWidth: 100,
-      renderCell: (params: GridRenderCellParams<Node>) => (
+      renderCell: (params: GridRenderCellParams<Peer>) => (
         <Chip
           label={params.value ? 'Active' : 'Inactive'}
           color={params.value ? 'success' : 'default'}
@@ -161,7 +161,7 @@ function Nodes() {
       headerName: 'Created',
       flex: 0.7,
       minWidth: 180,
-      renderCell: (params: GridRenderCellParams<Node>) => {
+      renderCell: (params: GridRenderCellParams<Peer>) => {
         const createdAt = params.row?.created_at
         if (!createdAt) return '-'
         const parsed = new Date(createdAt)
@@ -173,7 +173,7 @@ function Nodes() {
       headerName: 'Config Downloaded',
       flex: 0.5,
       minWidth: 110,
-      renderCell: (params: GridRenderCellParams<Node>) => (
+      renderCell: (params: GridRenderCellParams<Peer>) => (
         <Chip
           label={params.value ? 'Yes' : 'No'}
           color={params.value ? 'info' : 'default'}
@@ -188,12 +188,12 @@ function Nodes() {
       flex: 0.7,
       minWidth: 150,
       sortable: false,
-      renderCell: (params: GridRenderCellParams<Node>) => (
+      renderCell: (params: GridRenderCellParams<Peer>) => (
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <IconButton
             size="small"
             onClick={() => handleShowConfig(params.row)}
-            title="Download Node Config"
+            title="Download Peer Config"
             disabled={!isAuthenticated}
           >
             <DownloadIcon />
@@ -220,43 +220,43 @@ function Nodes() {
     },
   ]
 
-  const totalNodes = clients.length
-  const activeNodes = clients.filter((node) => node.is_active).length
-  const downloadedCount = clients.filter((node) => node.config_downloaded).length
-  const inactiveNodes = Math.max(totalNodes - activeNodes, 0)
-  const undownloadedCount = Math.max(totalNodes - downloadedCount, 0)
-  const namedCount = clients.filter((node) => Boolean(node.name)).length
-  const recent24hCount = clients.filter((node) => {
-    const created = new Date(node.created_at || '')
+  const totalPeers = peers.length
+  const activePeers = peers.filter((peer) => peer.is_active).length
+  const downloadedCount = peers.filter((peer) => peer.config_downloaded).length
+  const inactivePeers = Math.max(totalPeers - activePeers, 0)
+  const undownloadedCount = Math.max(totalPeers - downloadedCount, 0)
+  const namedCount = peers.filter((peer) => Boolean(peer.name)).length
+  const recent24hCount = peers.filter((peer) => {
+    const created = new Date(peer.created_at || '')
     if (Number.isNaN(created.getTime())) return false
     return Date.now() - created.getTime() <= 24 * 60 * 60 * 1000
   }).length
-  const activeRatio = totalNodes > 0 ? (activeNodes / totalNodes) * 100 : 0
-  const adoptionRatio = totalNodes > 0 ? (downloadedCount / totalNodes) * 100 : 0
+  const activeRatio = totalPeers > 0 ? (activePeers / totalPeers) * 100 : 0
+  const adoptionRatio = totalPeers > 0 ? (downloadedCount / totalPeers) * 100 : 0
 
   const summaryCards: CardItem[] = [
     {
       key: 'total',
       title: 'TOTAL RECORDS',
-      value: String(totalNodes),
-      hint: `active ${activeNodes} | inactive ${inactiveNodes}`,
+      value: String(totalPeers),
+      hint: `active ${activePeers} | inactive ${inactivePeers}`,
       status: 'green',
-      importance: 'Defines current node inventory and management footprint.',
+      importance: 'Defines current peer inventory and management footprint.',
     },
     {
       key: 'active-ratio',
       title: 'ACTIVE RATIO',
       value: `${activeRatio.toFixed(0)}%`,
-      hint: `${activeNodes}/${totalNodes || 1} active`,
+      hint: `${activePeers}/${totalPeers || 1} active`,
       status: activeRatio >= 75 ? 'green' : activeRatio >= 50 ? 'amber' : 'red',
       importance: 'Shows how much of the registry is currently enabled for secure exchange.',
     },
     {
       key: 'downloaded',
       title: 'CONFIG ADOPTION',
-      value: `${downloadedCount}/${totalNodes || 1}`,
-      hint: 'node configs downloaded at least once',
-      status: totalNodes === 0 ? 'amber' : downloadedCount === totalNodes ? 'green' : 'amber',
+      value: `${downloadedCount}/${totalPeers || 1}`,
+      hint: 'peer configs downloaded at least once',
+      status: totalPeers === 0 ? 'amber' : downloadedCount === totalPeers ? 'green' : 'amber',
       importance: 'Adoption indicates whether provisioned peers are likely usable by operators.',
     },
     {
@@ -270,9 +270,9 @@ function Nodes() {
     {
       key: 'named',
       title: 'NAMED PROFILES',
-      value: `${namedCount}/${totalNodes || 1}`,
-      hint: `${Math.max(totalNodes - namedCount, 0)} unnamed records`,
-      status: namedCount === totalNodes ? 'green' : 'amber',
+      value: `${namedCount}/${totalPeers || 1}`,
+      hint: `${Math.max(totalPeers - namedCount, 0)} unnamed records`,
+      status: namedCount === totalPeers ? 'green' : 'amber',
       importance: 'Readable identity labels reduce operator mistakes during incident response.',
     },
     {
@@ -295,14 +295,14 @@ function Nodes() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>Nodes Grid :: [identity control] (o_o)</Typography>
+      <Typography variant="h4" gutterBottom>Peers Grid :: [identity control] (o_o)</Typography>
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-        Dense node registry | one source of truth for provisioning and lifecycle actions
+        Dense peer registry | one source of truth for provisioning and lifecycle actions
       </Typography>
 
       {!isAuthenticated && (
         <Alert severity="info" sx={{ mb: 1 }}>
-          Read-only mode is active. Login to create, modify, or download node configurations.
+          Read-only mode is active. Login to create, modify, or download peer configurations.
         </Alert>
       )}
 
@@ -330,23 +330,23 @@ function Nodes() {
               disabled={!isAuthenticated}
               onClick={() => setCreateDialogOpen(true)}
             >
-              Create Node
+              Create Peer
             </Button>
             <Typography variant="caption" color="text.secondary">
-              Use row action icons to download config, toggle status, or delete a node.
+              Use row action icons to download config, toggle status, or delete a peer.
             </Typography>
             <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
-              <Chip size="small" label={`records:${totalNodes}`} color="default" />
-              <Chip size="small" label={`active:${activeNodes}`} color="success" />
+              <Chip size="small" label={`records:${totalPeers}`} color="default" />
+              <Chip size="small" label={`active:${activePeers}`} color="success" />
               <Chip size="small" label={`downloaded:${downloadedCount}`} color="info" />
             </Stack>
           </Stack>
         </DenseSection>
 
-        <DenseSection title="Node Registry" subtitle="dense operator table" colSpan={3} rowSpan={1}>
+        <DenseSection title="Peer Registry" subtitle="dense operator table" colSpan={3} rowSpan={1}>
           <DataGrid
             autoHeight
-            rows={clients}
+            rows={peers}
             columns={columns}
             loading={loading}
             initialState={{
@@ -365,17 +365,17 @@ function Nodes() {
         </DenseSection>
       </DenseGrid>
 
-      <CreateNodeDialog
+      <CreatePeerDialog
         open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}
         onSuccess={handleCreateSuccess}
       />
 
-      <NodeConfigDialog
+      <PeerConfigDialog
         open={configDialogOpen}
         onClose={() => setConfigDialogOpen(false)}
-        nodeId={selectedNode?.id}
-        nodeEmail={selectedNode?.email}
+        peerId={selectedPeer?.id}
+        peerEmail={selectedPeer?.email}
       />
 
       <Snackbar
@@ -395,4 +395,4 @@ function Nodes() {
   )
 }
 
-export default Nodes
+export default Peers

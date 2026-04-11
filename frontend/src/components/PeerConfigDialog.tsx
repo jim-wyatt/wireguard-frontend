@@ -13,16 +13,16 @@ import {
 } from '@mui/material'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import DownloadIcon from '@mui/icons-material/Download'
-import { clientsApi } from '../services/api'
+import { peersApi } from '../services/api'
 
-interface NodeConfigDialogProps {
+interface PeerConfigDialogProps {
   open: boolean
   onClose: () => void
-  nodeId?: number | string
-  nodeEmail?: string
+  peerId?: number | string
+  peerEmail?: string
 }
 
-function NodeConfigDialog({ open, onClose, nodeId, nodeEmail }: NodeConfigDialogProps) {
+function PeerConfigDialog({ open, onClose, peerId, peerEmail }: PeerConfigDialogProps) {
   const [config, setConfig] = useState<string | null>(null)
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -30,11 +30,11 @@ function NodeConfigDialog({ open, onClose, nodeId, nodeEmail }: NodeConfigDialog
   const [copied, setCopied] = useState(false)
 
   const loadConfig = useCallback(async () => {
-    if (!nodeId) return
+    if (!peerId) return
     setLoading(true)
     setError(null)
     try {
-      const response = await clientsApi.getClientConfig(nodeId)
+      const response = await peersApi.getPeerConfig(peerId)
       setConfig(response.data.config as string)
       setQrCode(response.data.qr_code as string)
     } catch (err: unknown) {
@@ -43,13 +43,13 @@ function NodeConfigDialog({ open, onClose, nodeId, nodeEmail }: NodeConfigDialog
     } finally {
       setLoading(false)
     }
-  }, [nodeId])
+  }, [peerId])
 
   useEffect(() => {
-    if (open && nodeId) {
+    if (open && peerId) {
       loadConfig()
     }
-  }, [open, nodeId, loadConfig])
+  }, [open, peerId, loadConfig])
 
   const handleCopy = () => {
     if (!config) return
@@ -64,14 +64,14 @@ function NodeConfigDialog({ open, onClose, nodeId, nodeEmail }: NodeConfigDialog
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${nodeEmail || 'node'}.conf`
+    a.download = `${peerEmail || 'peer'}.conf`
     a.click()
     URL.revokeObjectURL(url)
   }
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>Node Configuration</DialogTitle>
+      <DialogTitle>Peer Configuration</DialogTitle>
       <DialogContent>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -126,4 +126,4 @@ function NodeConfigDialog({ open, onClose, nodeId, nodeEmail }: NodeConfigDialog
   )
 }
 
-export default NodeConfigDialog
+export default PeerConfigDialog

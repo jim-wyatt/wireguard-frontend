@@ -33,27 +33,27 @@ export interface StreamLogsParams {
   onLine: (line: string) => void
 }
 
-export const clientsApi = {
-  getClients: () => api.get('/nodes'),
-  getStats: () => api.get('/nodes/stats', {
+export const peersApi = {
+  getPeers: () => api.get('/peers'),
+  getStats: () => api.get('/peers/stats', {
     params: { _ts: Date.now() },
     headers: {
       'Cache-Control': 'no-cache',
       Pragma: 'no-cache',
     },
   }),
-  getConnectedClients: () => api.get('/nodes/connected', {
+  getConnectedPeers: () => api.get('/peers/connected', {
     params: { _ts: Date.now() },
     headers: {
       'Cache-Control': 'no-cache',
       Pragma: 'no-cache',
     },
   }),
-  getClient: (id: number | string) => api.get(`/nodes/${id}`),
-  createClient: (data: { email: string; name?: string }) => api.post('/nodes', data),
-  getClientConfig: (id: number | string) => api.get(`/nodes/${id}/config`),
-  deleteClient: (id: number | string) => api.delete(`/nodes/${id}`),
-  toggleClientStatus: (id: number | string) => api.patch(`/nodes/${id}/toggle`),
+  getPeer: (id: number | string) => api.get(`/peers/${id}`),
+  createPeer: (data: { email: string; name?: string }) => api.post('/peers', data),
+  getPeerConfig: (id: number | string) => api.get(`/peers/${id}/config`),
+  deletePeer: (id: number | string) => api.delete(`/peers/${id}`),
+  togglePeerStatus: (id: number | string) => api.patch(`/peers/${id}/toggle`),
 
   streamLogs: async ({ signal, source = 'caddy', tail = 100, follow = true, onLine }: StreamLogsParams): Promise<void> => {
     const token = (window.localStorage.getItem('apiToken') || '').trim()
@@ -101,7 +101,7 @@ export const clientsApi = {
   },
 
   streamCaddyAccessLog: async ({ signal, tail = 100, onLine }: Omit<StreamLogsParams, 'source' | 'follow'>): Promise<void> =>
-    clientsApi.streamLogs({ signal, source: 'caddy', tail, onLine }),
+    peersApi.streamLogs({ signal, source: 'caddy', tail, onLine }),
 
   getAttestationSummary: () => api.get('/attestation/summary', {
     params: { _ts: Date.now() },
@@ -135,5 +135,7 @@ export const clientsApi = {
     },
   }),
 }
+
+export const clientsApi = peersApi
 
 export default api

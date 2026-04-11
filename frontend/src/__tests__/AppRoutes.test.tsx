@@ -8,8 +8,8 @@ vi.mock('../pages/Dashboard', () => ({
   default: () => <div>Private Dashboard</div>,
 }))
 
-vi.mock('../pages/Nodes', () => ({
-  default: () => <div>Nodes</div>,
+vi.mock('../pages/Peers', () => ({
+  default: () => <div>Peers</div>,
 }))
 
 vi.mock('../pages/Logs', () => ({
@@ -69,7 +69,7 @@ describe('App routing', () => {
 
   it('still redirects protected routes to login when not authenticated', async () => {
     render(
-      <MemoryRouter initialEntries={['/nodes']}>
+      <MemoryRouter initialEntries={['/peers']}>
         <UiProvider>
           <AuthProvider>
             <App />

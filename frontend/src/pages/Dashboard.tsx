@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Box } from '@mui/material'
-import { clientsApi } from '../services/api'
+import { peersApi } from '../services/api'
 import { DenseCards, DenseGrid, DenseMetricCard, DenseSection } from '../components/dense/CyberUi'
 import type { RagStatus } from '../components/dense/CyberUi'
 
@@ -13,7 +13,7 @@ interface CardItem {
   importance?: string
 }
 
-interface NodeStats {
+interface PeerStats {
   total_clients?: number
   active_clients?: number
   connected_clients?: number
@@ -22,7 +22,7 @@ interface NodeStats {
 type ApiData = Record<string, unknown>
 
 function Dashboard() {
-  const [clientStats, setClientStats] = useState<NodeStats | null>(null)
+  const [clientStats, setClientStats] = useState<PeerStats | null>(null)
   const [metrics, setMetrics] = useState<ApiData | null>(null)
   const [attestation, setAttestation] = useState<ApiData | null>(null)
   const [error, setError] = useState('')
@@ -38,11 +38,11 @@ function Dashboard() {
     setError('')
     try {
       const [statsRes, metricsRes, attestationRes] = await Promise.all([
-        clientsApi.getStats(),
-        clientsApi.getMetricsSummary(),
-        clientsApi.getAttestationSummary(),
+        peersApi.getStats(),
+        peersApi.getMetricsSummary(),
+        peersApi.getAttestationSummary(),
       ])
-      setClientStats(statsRes.data as NodeStats)
+      setClientStats(statsRes.data as PeerStats)
       setMetrics(metricsRes.data as ApiData)
       setAttestation(attestationRes.data as ApiData)
     } catch (err: unknown) {
@@ -99,9 +99,9 @@ function Dashboard() {
     const cards: CardItem[] = [
       {
         key: 'clients',
-        title: 'NODES TAB',
+        title: 'PEERS TAB',
         value: `${connected}/${active}`,
-        hint: `${total} total nodes | route /nodes`,
+        hint: `${total} total peers | route /peers`,
         status: active > 0 ? 'green' : 'amber',
         importance: 'Quick view of adoption and current tunnel activity.',
       },

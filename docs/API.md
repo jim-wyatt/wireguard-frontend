@@ -37,7 +37,7 @@ Roles:
 
 - `GET /`
 - `GET /health`
-- `GET /api/nodes/stats`
+- `GET /api/peers/stats`
 - `GET /api/logs/stream`
 - `GET /api/logs/caddy/access/stream`
 - `GET /api/metrics/summary`
@@ -45,28 +45,28 @@ Roles:
 
 ### Auth Required (Public or Writer Role)
 
-- `GET /api/nodes`
-- `GET /api/nodes/connected`
-- `GET /api/nodes/{client_id}`
+- `GET /api/peers`
+- `GET /api/peers/connected`
+- `GET /api/peers/{client_id}`
 - `GET /api/debug/top/snapshot`
 - `GET /api/debug/btop/snapshot`
 
 ### Writer Role Required
 
-- `POST /api/nodes`
-- `GET /api/nodes/{client_id}/config`
-- `PATCH /api/nodes/{client_id}/toggle`
-- `DELETE /api/nodes/{client_id}`
+- `POST /api/peers`
+- `GET /api/peers/{client_id}/config`
+- `PATCH /api/peers/{client_id}/toggle`
+- `DELETE /api/peers/{client_id}`
 
 ## Legacy Compatibility Routes
 
-`/api/clients*` routes are supported and redirect to canonical `/api/nodes*` routes.
+`/api/clients*` routes are supported and redirect to canonical `/api/peers*` routes.
 
-## Node Endpoints
+## Peer Endpoints
 
-### Create Node
+### Create Peer
 
-- `POST /api/nodes`
+- `POST /api/peers`
 - Body:
 
 ```json
@@ -76,33 +76,33 @@ Roles:
 }
 ```
 
-### List Nodes
+### List Peers
 
-- `GET /api/nodes?skip=0&limit=100&active_only=false`
+- `GET /api/peers?skip=0&limit=100&active_only=false`
 
-### Node Stats
+### Peer Stats
 
-- `GET /api/nodes/stats`
+- `GET /api/peers/stats`
 
-### Connected Nodes
+### Connected Peers
 
-- `GET /api/nodes/connected`
+- `GET /api/peers/connected`
 
-### Node Detail
+### Peer Detail
 
-- `GET /api/nodes/{client_id}`
+- `GET /api/peers/{client_id}`
 
-### Node Config + QR
+### Peer Config + QR
 
-- `GET /api/nodes/{client_id}/config`
+- `GET /api/peers/{client_id}/config`
 
-### Toggle Node Active State
+### Toggle Peer Active State
 
-- `PATCH /api/nodes/{client_id}/toggle`
+- `PATCH /api/peers/{client_id}/toggle`
 
-### Delete Node
+### Delete Peer
 
-- `DELETE /api/nodes/{client_id}`
+- `DELETE /api/peers/{client_id}`
 
 ## Observability Endpoints
 

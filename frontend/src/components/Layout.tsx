@@ -45,7 +45,7 @@ function Layout() {
 
   const navItems: NavItem[] = [
     { text: 'Dash', icon: <DashboardIcon fontSize="small" />, path: '/dashboard' },
-    { text: 'Nodes', icon: <PeopleIcon fontSize="small" />, path: '/nodes' },
+    { text: 'Peers', icon: <PeopleIcon fontSize="small" />, path: '/peers' },
     { text: 'Logs', icon: <ReceiptLongIcon fontSize="small" />, path: '/logs' },
     { text: 'Trust', icon: <PolicyIcon fontSize="small" />, path: '/attestation' },
     { text: 'Metrics', icon: <QueryStatsIcon fontSize="small" />, path: '/metrics' },
@@ -58,7 +58,7 @@ function Layout() {
 
     const navHotkeys: Record<string, string> = {
       '1': '/dashboard',
-      '2': '/nodes',
+      '2': '/peers',
       '3': '/logs',
       '4': '/attestation',
       '5': '/metrics',
@@ -126,7 +126,7 @@ function Layout() {
           <Stack direction="row" spacing={0.75} sx={{ flexGrow: 1, alignItems: 'center' }}>
             <VpnKeyIcon sx={{ fontSize: 18 }} />
             <Typography variant="subtitle2" sx={{ fontWeight: 700, letterSpacing: 1 }}>NEXUS</Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.62rem' }}>// TRUSTED NODE EXCHANGE HUB</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.62rem' }}>// TRUSTED PEER EXCHANGE HUB</Typography>
             <Typography variant="caption" color="text.secondary">| 1-7</Typography>
             <Typography variant="caption" color="text.secondary">| {location.pathname}</Typography>
           </Stack>

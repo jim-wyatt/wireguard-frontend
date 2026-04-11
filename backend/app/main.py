@@ -42,8 +42,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="WireGuard Management API",
-        description="API for managing WireGuard VPN clients",
+        title="WireGuard Peer Management API",
+        description="API for managing WireGuard VPN peers",
         version=settings.APP_VERSION,
         lifespan=lifespan,
         docs_url="/docs" if settings.ENABLE_API_DOCS else None,
@@ -60,45 +60,45 @@ def create_app() -> FastAPI:
     )
 
     # Include routers
-    app.include_router(clients.router, prefix="/api", tags=["nodes"])
+    app.include_router(clients.router, prefix="/api", tags=["peers"])
     app.include_router(logs.router, prefix="/api", tags=["logs"])
     app.include_router(attestation.router, prefix="/api", tags=["attestation"])
     app.include_router(metrics.router, prefix="/api", tags=["metrics"])
     app.include_router(debug.router, prefix="/api", tags=["debug"])
 
     # Backward-compat: keep legacy /clients endpoints discoverable and redirect
-    # them to the canonical /nodes routes (308 preserves method and request body).
-    def _clients_redirect(path: str = "") -> RedirectResponse:
+    # them to the canonical /peers routes (308 preserves method and body).
+    def _peers_redirect(path: str = "") -> RedirectResponse:
         suffix = f"/{path.lstrip('/')}" if path else ""
-        return RedirectResponse(url=f"/api/nodes{suffix}", status_code=308)
+        return RedirectResponse(url=f"/api/peers{suffix}", status_code=308)
 
     @app.api_route("/api/clients", methods=["GET", "POST"])
     async def clients_root_compat(request: Request):  # noqa: ARG001
-        return _clients_redirect()
+        return _peers_redirect()
 
     @app.get("/api/clients/stats")
     async def clients_stats_compat(request: Request):  # noqa: ARG001
-        return _clients_redirect("stats")
+        return _peers_redirect("stats")
 
     @app.get("/api/clients/connected")
     async def clients_connected_compat(request: Request):  # noqa: ARG001
-        return _clients_redirect("connected")
+        return _peers_redirect("connected")
 
     @app.api_route("/api/clients/{client_id}", methods=["GET", "DELETE"])
     async def clients_detail_compat(client_id: int, request: Request):  # noqa: ARG001
-        return _clients_redirect(str(client_id))
+        return _peers_redirect(str(client_id))
 
     @app.get("/api/clients/{client_id}/config")
     async def clients_config_compat(client_id: int, request: Request):  # noqa: ARG001
-        return _clients_redirect(f"{client_id}/config")
+        return _peers_redirect(f"{client_id}/config")
 
     @app.patch("/api/clients/{client_id}/toggle")
     async def clients_toggle_compat(client_id: int, request: Request):  # noqa: ARG001
-        return _clients_redirect(f"{client_id}/toggle")
+        return _peers_redirect(f"{client_id}/toggle")
 
     @app.api_route("/api/clients/{path:path}", methods=["GET", "POST", "PATCH", "DELETE"], include_in_schema=False)
     async def clients_compat_redirect(path: str, request: Request):  # noqa: ARG001
-        return _clients_redirect(path)
+        return _peers_redirect(path)
 
     @app.middleware("http")
     async def capture_internal_metrics(request, call_next):
@@ -118,7 +118,7 @@ def create_app() -> FastAPI:
     @app.get("/")
     async def root():
         return {
-            "message": "WireGuard Management API",
+            "message": "WireGuard Peer Management API",
             "version": settings.APP_VERSION,
             "docs": "/docs"
         }

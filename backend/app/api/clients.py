@@ -96,14 +96,14 @@ def _public_connected_view(client: Client, peer_info: dict) -> ClientConnected:
         transfer_tx=peer_info["transfer_tx"],
     )
 
-@router.post("/nodes", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/peers", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
 async def create_client(
     client: ClientCreate,
     db: Session = Depends(get_db),
     _: None = Depends(require_writer_role),
     __: None = Depends(writer_rate_limit),
 ):
-    """Create a new WireGuard client"""
+    """Create a new WireGuard peer"""
     
     # Check if email already exists
     existing_client = db.query(Client).filter(Client.email == client.email).first()
@@ -173,7 +173,7 @@ async def create_client(
             detail="Failed to create client"
         )
 
-@router.get("/nodes", response_model=List[ClientResponse])
+@router.get("/peers", response_model=List[ClientResponse])
 async def list_clients(
     request: Request,
     response: Response,
@@ -184,7 +184,7 @@ async def list_clients(
     _: None = Depends(require_api_auth),
     __: None = Depends(dashboard_rate_limit),
 ):
-    """List all clients"""
+    """List all peers"""
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
 
@@ -199,13 +199,13 @@ async def list_clients(
 
     return clients
 
-@router.get("/nodes/stats", response_model=ClientStats)
+@router.get("/peers/stats", response_model=ClientStats)
 async def get_stats(
     response: Response,
     db: Session = Depends(get_db),
     _: None = Depends(dashboard_rate_limit),
 ):
-    """Get client statistics"""
+    """Get peer statistics"""
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
 
@@ -234,7 +234,7 @@ async def get_stats(
         last_updated=now,
     )
 
-@router.get("/nodes/connected", response_model=List[ClientConnected])
+@router.get("/peers/connected", response_model=List[ClientConnected])
 async def get_connected_clients(
     request: Request,
     response: Response,
@@ -242,7 +242,7 @@ async def get_connected_clients(
     __: None = Depends(require_api_auth),
     _: None = Depends(dashboard_rate_limit),
 ):
-    """Get list of currently connected clients"""
+    """Get list of currently connected peers"""
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
 
@@ -288,7 +288,7 @@ async def get_connected_clients(
     
     return connected_clients
 
-@router.get("/nodes/{client_id}", response_model=ClientResponse)
+@router.get("/peers/{client_id}", response_model=ClientResponse)
 async def get_client(
     request: Request,
     client_id: int,
@@ -296,7 +296,7 @@ async def get_client(
     _: None = Depends(require_api_auth),
     __: None = Depends(dashboard_rate_limit),
 ):
-    """Get client details"""
+    """Get peer details"""
     client = db.query(Client).filter(Client.id == client_id).first()
     if not client:
         raise HTTPException(
@@ -305,14 +305,14 @@ async def get_client(
         )
     return client
 
-@router.get("/nodes/{client_id}/config", response_model=ClientConfig)
+@router.get("/peers/{client_id}/config", response_model=ClientConfig)
 async def get_client_config(
     client_id: int,
     db: Session = Depends(get_db),
     _: None = Depends(require_writer_role),
     __: None = Depends(writer_rate_limit),
 ):
-    """Get client configuration with QR code"""
+    """Get peer configuration with QR code"""
     client = db.query(Client).filter(Client.id == client_id).first()
     if not client:
         raise HTTPException(
@@ -337,14 +337,14 @@ async def get_client_config(
     
     return ClientConfig(config=config, qr_code=qr_code)
 
-@router.delete("/nodes/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/peers/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_client(
     client_id: int,
     db: Session = Depends(get_db),
     _: None = Depends(require_writer_role),
     __: None = Depends(writer_rate_limit),
 ):
-    """Delete a client"""
+    """Delete a peer"""
     client = db.query(Client).filter(Client.id == client_id).first()
     if not client:
         raise HTTPException(
@@ -365,14 +365,14 @@ async def delete_client(
     
     return None
 
-@router.patch("/nodes/{client_id}/toggle", response_model=ClientResponse)
+@router.patch("/peers/{client_id}/toggle", response_model=ClientResponse)
 async def toggle_client_status(
     client_id: int,
     db: Session = Depends(get_db),
     _: None = Depends(require_writer_role),
     __: None = Depends(writer_rate_limit),
 ):
-    """Toggle client active status"""
+    """Toggle peer active status"""
     client = db.query(Client).filter(Client.id == client_id).first()
     if not client:
         raise HTTPException(

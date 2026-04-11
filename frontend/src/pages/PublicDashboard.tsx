@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Box, Typography } from '@mui/material'
-import { clientsApi } from '../services/api'
+import { peersApi } from '../services/api'
 import { DenseCards, DenseGrid, DenseMetricCard, DenseSection } from '../components/dense/CyberUi'
 import type { RagStatus } from '../components/dense/CyberUi'
 
-interface NodeStats {
+interface PeerStats {
   total_clients?: number
   active_clients?: number
   connected_clients?: number
@@ -21,7 +21,7 @@ interface CardItem {
 }
 
 function PublicDashboard() {
-  const [stats, setStats] = useState<NodeStats | null>(null)
+  const [stats, setStats] = useState<PeerStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -36,8 +36,8 @@ function PublicDashboard() {
     const loadStats = async () => {
       setError('')
       try {
-        const response = await clientsApi.getStats()
-        setStats(response.data as NodeStats)
+        const response = await peersApi.getStats()
+        setStats(response.data as PeerStats)
       } catch (err: unknown) {
         const e = err as { response?: { data?: { detail?: string } }; message?: string }
         setError(e?.response?.data?.detail || e?.message || 'Failed to load public stats')
@@ -56,13 +56,13 @@ function PublicDashboard() {
       key: 'engagement',
       title: 'ENGAGEMENT RATE',
       value: `${((Number(stats?.connected_clients || 0) / Math.max(Number(stats?.active_clients || 1), 1)) * 100).toFixed(0)}%`,
-      hint: `${stats?.connected_clients || 0} connected of ${stats?.active_clients || 0} active nodes`,
+      hint: `${stats?.connected_clients || 0} connected of ${stats?.active_clients || 0} active peers`,
       status: Number(stats?.active_clients || 0) === 0 ? 'amber' : (Number(stats?.connected_clients || 0) / Math.max(Number(stats?.active_clients || 1), 1)) >= 0.7 ? 'green' : 'amber',
       importance: 'Shows current participation across enabled identities.',
     },
     {
       key: 'total',
-      title: 'TOTAL NODES',
+      title: 'TOTAL PEERS',
       value: String(stats?.total_clients || 0),
       hint: 'registered peer identities',
       status: 'green',
@@ -70,7 +70,7 @@ function PublicDashboard() {
     },
     {
       key: 'active',
-      title: 'ACTIVE NODES',
+      title: 'ACTIVE PEERS',
       value: String(stats?.active_clients || 0),
       hint: 'eligible to connect now',
       status: Number(stats?.active_clients || 0) > 0 ? 'green' : 'amber',
@@ -139,7 +139,7 @@ function PublicDashboard() {
       </Typography>
 
       <DenseGrid>
-        <DenseSection title="Public Network Status" subtitle="live node participation — no auth required" colSpan={3} rowSpan={3}>
+        <DenseSection title="Public Network Status" subtitle="live peer participation — no auth required" colSpan={3} rowSpan={3}>
           <DenseCards>
             {cards.map((card) => (
               <DenseMetricCard

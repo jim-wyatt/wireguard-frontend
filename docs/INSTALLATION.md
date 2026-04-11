@@ -76,7 +76,7 @@ ENABLE_SECURITY_SIDECARS=true make prod-up
 ```bash
 sudo podman ps
 curl http://127.0.0.1:8000/health
-curl -k https://$DOMAIN/api/nodes/stats
+curl -k https://$DOMAIN/api/peers/stats
 ```
 
 ## 5. Operate

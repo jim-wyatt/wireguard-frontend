@@ -5,7 +5,7 @@ import Layout from './components/Layout'
 import { useAuth } from './context/AuthContext'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
-const Nodes = lazy(() => import('./pages/Nodes'))
+const Peers = lazy(() => import('./pages/Peers'))
 const Logs = lazy(() => import('./pages/Logs'))
 const Attestation = lazy(() => import('./pages/Attestation'))
 const Metrics = lazy(() => import('./pages/Metrics'))
@@ -57,12 +57,12 @@ function App() {
       } />
 
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
-        <Route path="/nodes" element={
+        <Route path="/peers" element={
           <Suspense fallback={<PageLoader />}>
-            <Nodes />
+            <Peers />
           </Suspense>
         } />
-        <Route path="/clients" element={<Navigate to="/nodes" replace />} />
+        <Route path="/clients" element={<Navigate to="/peers" replace />} />
         <Route path="/logs" element={
           <Suspense fallback={<PageLoader />}>
             <Logs />
