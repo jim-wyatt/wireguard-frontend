@@ -180,7 +180,7 @@ PersistentKeepalive = 25
                 )
 
             return peers
-        except subprocess.CalledProcessError as e:
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
             logger.error("Failed to read configured peers", exc_info=True)
             return []
     
@@ -218,7 +218,7 @@ PersistentKeepalive = 25
                     }
             
             return peers
-        except subprocess.CalledProcessError as e:
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
             logger.error("Failed to get connected peers", exc_info=True)
             return {}
 
@@ -248,7 +248,7 @@ PersistentKeepalive = 25
                 text=True,
             )
             summary["is_up"] = True
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, FileNotFoundError):
             return summary
 
         try:
@@ -271,7 +271,7 @@ PersistentKeepalive = 25
             key_value = key_result.stdout.strip()
             if key_value:
                 summary["public_key"] = key_value
-        except (subprocess.CalledProcessError, ValueError):
+        except (subprocess.CalledProcessError, FileNotFoundError, ValueError):
             logger.warning("Failed to read WireGuard interface metadata", exc_info=True)
 
         configured_peers = self.get_configured_peers()
