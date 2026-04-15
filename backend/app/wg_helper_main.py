@@ -10,6 +10,20 @@ from app.core.config import settings
 
 WG_PUBLIC_KEY_PATTERN = re.compile(r"^[A-Za-z0-9+/]{43}=$")
 INTERFACE_PATTERN = re.compile(r"^[A-Za-z0-9_.=-]{1,32}$")
+ALLOWED_BINARIES = {"ip", "wg", "wg-quick"}
+ALLOWED_FIXED_ARGS = {
+    "link",
+    "show",
+    "dump",
+    "listen-port",
+    "public-key",
+    "set",
+    "peer",
+    "allowed-ips",
+    "remove",
+    "save",
+}
+ALLOWED_IP_CIDR_PATTERN = re.compile(r"^[0-9a-fA-F:.]+/(32|128)$")
 
 app = FastAPI(title="WireGuard Helper", docs_url=None, openapi_url=None)
 
@@ -58,7 +72,20 @@ def _validate_ip(ip_address: str) -> str:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid IP address") from exc
 
 
+def _is_safe_arg(arg: str) -> bool:
+    return (
+        arg in ALLOWED_FIXED_ARGS
+        or bool(INTERFACE_PATTERN.match(arg))
+        or bool(WG_PUBLIC_KEY_PATTERN.match(arg))
+        or bool(ALLOWED_IP_CIDR_PATTERN.match(arg))
+    )
+
+
 def _run(args: list[str]) -> str:
+    if not args or args[0] not in ALLOWED_BINARIES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid command")
+    if any(not _is_safe_arg(arg) for arg in args[1:]):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid command arguments")
     try:
         result = subprocess.run(args, capture_output=True, text=True, check=True)
     except FileNotFoundError as exc:
