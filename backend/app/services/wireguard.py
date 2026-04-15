@@ -4,11 +4,34 @@ import logging
 import re
 from typing import List, Dict, Optional
 from datetime import datetime, timezone
+import httpx
 from app.core.config import settings
 
 
 logger = logging.getLogger(__name__)
 WG_PUBLIC_KEY_PATTERN = re.compile(r"^[A-Za-z0-9+/]{43}=$")
+WG_HELPER_TIMEOUT = 5.0
+
+
+def _run_helper(endpoint: str, payload: Dict[str, str]) -> str:
+    token = (settings.WG_HELPER_TOKEN or settings.API_SECRET_KEY).strip()
+    try:
+        response = httpx.post(
+            f"{settings.WG_HELPER_URL}{endpoint}",
+            json=payload,
+            headers={"X-WG-Helper-Token": token},
+            timeout=WG_HELPER_TIMEOUT,
+        )
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        logger.error("WireGuard helper rejected request to %s: %s", endpoint, exc.response.text)
+        raise subprocess.CalledProcessError(returncode=1, cmd=endpoint, stderr=exc.response.text) from exc
+    except httpx.HTTPError as exc:
+        logger.error("WireGuard helper unavailable for %s", endpoint, exc_info=True)
+        raise FileNotFoundError(f"WireGuard helper unavailable at {settings.WG_HELPER_URL}") from exc
+
+    data = response.json()
+    return str(data.get("output", ""))
 
 class WireGuardService:
     def __init__(self):
@@ -105,22 +128,10 @@ PersistentKeepalive = 25
             return False
 
         try:
-            subprocess.run(
-                [
-                    "wg", "set", self.interface,
-                    "peer", public_key,
-                    "allowed-ips", f"{ip_address}/32"
-                ],
-                check=True,
-                capture_output=True
-            )
+            _run_helper("/add-peer", {"interface": self.interface, "public_key": public_key, "ip_address": ip_address})
             
             # Save configuration
-            subprocess.run(
-                ["wg-quick", "save", self.interface],
-                check=True,
-                capture_output=True
-            )
+            _run_helper("/save-config", {"interface": self.interface})
             
             return True
         except subprocess.CalledProcessError as e:
@@ -134,18 +145,10 @@ PersistentKeepalive = 25
             return False
 
         try:
-            subprocess.run(
-                ["wg", "set", self.interface, "peer", public_key, "remove"],
-                check=True,
-                capture_output=True
-            )
+            _run_helper("/remove-peer", {"interface": self.interface, "public_key": public_key})
             
             # Save configuration
-            subprocess.run(
-                ["wg-quick", "save", self.interface],
-                check=True,
-                capture_output=True
-            )
+            _run_helper("/save-config", {"interface": self.interface})
             
             return True
         except subprocess.CalledProcessError as e:
@@ -155,15 +158,10 @@ PersistentKeepalive = 25
     def get_configured_peers(self) -> List[Dict[str, Optional[str]]]:
         """Read peers configured on the WireGuard interface from `wg show ... dump`."""
         try:
-            result = subprocess.run(
-                ["wg", "show", self.interface, "dump"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
+            output = _run_helper("/show-dump", {"interface": self.interface})
 
             peers: List[Dict[str, Optional[str]]] = []
-            lines = result.stdout.strip().split("\n")
+            lines = output.strip().split("\n")
 
             # Skip first line (interface metadata)
             for line in lines[1:]:
@@ -187,15 +185,10 @@ PersistentKeepalive = 25
     def get_connected_peers(self) -> Dict[str, Dict]:
         """Get list of connected peers with their statistics"""
         try:
-            result = subprocess.run(
-                ["wg", "show", self.interface, "dump"],
-                capture_output=True,
-                text=True,
-                check=True
-            )
+            output = _run_helper("/show-dump", {"interface": self.interface})
             
             peers = {}
-            lines = result.stdout.strip().split('\n')
+            lines = output.strip().split('\n')
             
             # Skip first line (interface info)
             for line in lines[1:]:
@@ -241,34 +234,17 @@ PersistentKeepalive = 25
         }
 
         try:
-            subprocess.run(
-                ["ip", "link", "show", self.interface],
-                capture_output=True,
-                check=True,
-                text=True,
-            )
+            _run_helper("/ip-link-show", {"interface": self.interface})
             summary["is_up"] = True
         except (subprocess.CalledProcessError, FileNotFoundError):
             return summary
 
         try:
-            listen_result = subprocess.run(
-                ["wg", "show", self.interface, "listen-port"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            listen_value = listen_result.stdout.strip()
+            listen_value = _run_helper("/show-listen-port", {"interface": self.interface}).strip()
             if listen_value:
                 summary["listen_port"] = int(listen_value)
 
-            key_result = subprocess.run(
-                ["wg", "show", self.interface, "public-key"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            key_value = key_result.stdout.strip()
+            key_value = _run_helper("/show-public-key", {"interface": self.interface}).strip()
             if key_value:
                 summary["public_key"] = key_value
         except (subprocess.CalledProcessError, FileNotFoundError, ValueError):

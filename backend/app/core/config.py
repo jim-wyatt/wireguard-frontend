@@ -50,6 +50,8 @@ class Settings(BaseSettings):
     AUTH_FAIL_BLOCK_SECONDS: int = 300
     ENABLE_API_DOCS: bool = False
     WG_CONNECTED_TIMEOUT_SECONDS: int = 120  # Mobile peers can miss keepalives briefly; allow a 2-minute window
+    WG_HELPER_URL: str = "http://127.0.0.1:9789"
+    WG_HELPER_TOKEN: str = ""
     APP_VERSION: str = "1.0.0"
 
     def cors_origins_list(self) -> List[str]:
@@ -75,6 +77,10 @@ class Settings(BaseSettings):
 
         if not api_secret or api_secret == DEFAULT_INSECURE_SECRET:
             raise ValueError("Set a non-default API_SECRET_KEY before startup")
+
+        helper_token = (self.WG_HELPER_TOKEN or api_secret).strip()
+        if not helper_token:
+            raise ValueError("Set WG_HELPER_TOKEN or API_SECRET_KEY before startup")
 
         origins = self.cors_origins_list()
         if "*" in origins:

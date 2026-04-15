@@ -3,12 +3,17 @@ FROM docker.io/library/python:3.14.4-slim-trixie
 WORKDIR /app
 
 ARG GIT_COMMIT=unknown
+ARG NEXUS_UID=1000
+ARG NEXUS_GID=1000
 ENV GIT_COMMIT=${GIT_COMMIT}
 
 # Install runtime tools used by debug endpoints and WireGuard operations.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends wireguard-tools iproute2 btop procps && \
+    apt-get install -y --no-install-recommends wireguard-tools iproute2 btop procps util-linux && \
     rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --gid ${NEXUS_GID} nexus && \
+    useradd --uid ${NEXUS_UID} --gid ${NEXUS_GID} --create-home --shell /usr/sbin/nologin nexus
 
 # Copy requirements
 COPY requirements.txt .
@@ -18,12 +23,16 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application
 COPY . .
 
+RUN install -d -o nexus -g nexus /var/lib/wgapp /var/log/wg && \
+    install -o root -g root -m 0755 docker/entrypoint.sh /usr/local/bin/backend-entrypoint
+
 # Create directory for WireGuard configs
 RUN mkdir -p /etc/wireguard
 
-# Run as non-root user (note: WireGuard operations require elevated privileges)
-# For production, you'll need to run with appropriate capabilities
+# Backend runs as the dedicated nexus user. Privileged WireGuard actions are
+# isolated to a separate helper service instead of running uvicorn as root.
 
 EXPOSE 8000
 
+ENTRYPOINT ["/usr/local/bin/backend-entrypoint"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
