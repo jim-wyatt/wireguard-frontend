@@ -148,7 +148,7 @@ cleanup_rootless_stack
 stop_orphaned_backend_listener
 ENABLE_SECURITY_SIDECARS="${ENABLE_SECURITY_SIDECARS:-false}"
 
-SERVICE_LIST=(db node_exporter podman_exporter postgres_exporter backend caddy)
+SERVICE_LIST=(db node_exporter podman_exporter postgres_exporter wg-helper backend caddy)
 if [ "$ENABLE_SECURITY_SIDECARS" = "true" ]; then
     SERVICE_LIST+=(falco falcosidekick crowdsec trivy_server parca ebpf_agent)
     echo "Security sidecars enabled: deploying full security stack"
