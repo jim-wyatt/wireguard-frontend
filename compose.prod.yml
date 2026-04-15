@@ -258,6 +258,10 @@ services:
     init: true
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
     security_opt:
       - no-new-privileges:true
     pids_limit: 256
@@ -267,8 +271,9 @@ services:
         max-size: "10m"
         max-file: "5"
     command: ["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"]
-    # Podman Compose 1.0.6 can break host-network service startup when app-tier
-    # containers are chained with depends_on/--requires.
+    depends_on:
+      - db
+      - wg-helper
     network_mode: "host"
     pid: "host"
 
@@ -333,6 +338,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    depends_on:
+      - backend
     restart: always
     logging:
       options:

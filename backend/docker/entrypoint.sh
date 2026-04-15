@@ -12,7 +12,7 @@ ensure_runtime_dir() {
         mkdir -p "$path"
     fi
     if ! chown nexus:nexus "$path" 2>/dev/null; then
-        echo "warning: unable to chown $path for nexus; keeping current ownership" >&2
+        echo "warn: unable to chown $path for nexus; continuing and validating writability as nexus" >&2
     fi
 }
 
@@ -20,12 +20,17 @@ if [ "$(id -u)" -eq 0 ]; then
     ensure_runtime_dir /var/lib/wgapp
     ensure_runtime_dir /var/log/wg
 
+    if ! command -v setpriv >/dev/null 2>&1; then
+        echo "error: setpriv is required to drop privileges to nexus; set RUN_AS_ROOT=1 to explicitly allow running as root" >&2
+        exit 1
+    fi
+
     if setpriv --reuid nexus --regid nexus --init-groups sh -c 'test -w /var/lib/wgapp && test -w /var/log/wg'; then
         exec setpriv --reuid nexus --regid nexus --init-groups "$@"
     fi
 
-    echo "warning: runtime directories are not writable by nexus; starting as root" >&2
-    exec "$@"
+    echo "error: unable to start as nexus because /var/lib/wgapp and/or /var/log/wg are not writable by nexus; refusing to continue as root. Set RUN_AS_ROOT=1 to explicitly allow running as root" >&2
+    exit 1
 fi
 
 exec "$@"
