@@ -12,7 +12,8 @@ ensure_runtime_dir() {
         mkdir -p "$path"
     fi
     if ! chown nexus:nexus "$path" 2>/dev/null; then
-        echo "warn: unable to chown $path for nexus; continuing and validating writability as nexus" >&2
+        echo "error: fix the ownership/permissions of the mounted volume so nexus can write to it, or set RUN_AS_ROOT=1 to run explicitly as root" >&2
+        exit 1
     fi
 }
 

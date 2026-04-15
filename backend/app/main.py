@@ -6,6 +6,7 @@ import time
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
+from sqlalchemy.exc import OperationalError
 from app.core.config import settings
 from app.core.internal_metrics import internal_metrics
 from app.core.logging_config import configure_logging
@@ -25,8 +26,22 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     settings.validate_security_configuration()
 
-    # Keep schema setup in startup lifecycle rather than import time.
-    Base.metadata.create_all(bind=engine)
+    # Retry DB schema setup with bounded backoff so the backend doesn't crash-loop
+    # when Postgres isn't ready yet (e.g. cold start without depends_on ordering).
+    max_db_retries = 10
+    for attempt in range(1, max_db_retries + 1):
+        try:
+            Base.metadata.create_all(bind=engine)
+            break
+        except OperationalError as exc:
+            if attempt == max_db_retries:
+                raise
+            wait = min(2 ** attempt, 30)
+            logger.warning(
+                "Database not ready (attempt %d/%d), retrying in %ds: %s",
+                attempt, max_db_retries, wait, exc,
+            )
+            time.sleep(wait)
 
     db = SessionLocal()
     try:
