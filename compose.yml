@@ -30,6 +30,8 @@ services:
       WG_SERVER_PUBLIC_KEY: ${WG_SERVER_PUBLIC_KEY}
       WG_SERVER_PRIVATE_KEY: ${WG_SERVER_PRIVATE_KEY}
       WG_SERVER_ENDPOINT: ${WG_SERVER_ENDPOINT}
+      WG_HELPER_URL: http://127.0.0.1:9789
+      WG_HELPER_TOKEN: ${API_SECRET_KEY}
       WG_NETWORK: ${WG_NETWORK:-10.0.0.0/24}
       WG_DNS: ${WG_DNS:-1.1.1.1,8.8.8.8}
       API_SECRET_KEY: ${API_SECRET_KEY}
@@ -45,9 +47,30 @@ services:
       - caddy_logs:/var/log/caddy:ro
     depends_on:
       - db
+      - wg-helper
     network_mode: "host"
     restart: unless-stopped
-    # Required for host-level WireGuard operations
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  wg-helper:
+    build:
+      context: ./backend
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    environment:
+      WG_HELPER_TOKEN: ${API_SECRET_KEY}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      RUN_AS_ROOT: "1"
+    volumes:
+      - /etc/wireguard:/etc/wireguard
+    depends_on:
+      - db
+    network_mode: "host"
+    restart: unless-stopped
+    command: ["uvicorn", "app.wg_helper_main:app", "--host", "127.0.0.1", "--port", "9789"]
     cap_drop:
       - ALL
     cap_add:

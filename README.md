@@ -23,6 +23,11 @@ Web control plane for WireGuard peer lifecycle, observability, and security atte
 - Pydantic v2
 - Uvicorn
 
+Backend runtime notes:
+
+- `uvicorn` runs as the dedicated `nexus` user inside the backend container.
+- Privileged WireGuard operations are isolated to a separate helper service with `NET_ADMIN`; the main backend runs without that capability and keeps `no-new-privileges` enabled.
+
 ### Infrastructure
 - Podman + podman-compose
 - Caddy
