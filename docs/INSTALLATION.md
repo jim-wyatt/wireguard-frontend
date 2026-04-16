@@ -55,7 +55,7 @@ Database:
 Routing:
 
 - Set WG_CLIENT_ALLOWED_IPS to your WireGuard subnet, such as 10.0.0.0/24, to enable peer-to-peer routing between VPN clients.
-- Set it to 0.0.0.0/0, ::/0 if you want full-tunnel client routing instead.
+- Set it to "0.0.0.0/0, ::/0" if you want full-tunnel client routing instead.
 
 ## 3. Deploy Production Stack
 

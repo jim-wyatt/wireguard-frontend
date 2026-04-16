@@ -76,7 +76,7 @@ Create `.env` from `.env.example` and set at minimum:
 Peer-to-peer routing:
 
 - Set `WG_CLIENT_ALLOWED_IPS` to your VPN subnet (for example `10.0.0.0/24`) so peers can route to each other through WireGuard.
-- Use `0.0.0.0/0, ::/0` if you prefer full-tunnel clients.
+- Use "0.0.0.0/0, ::/0" if you prefer full-tunnel clients.
 
 Auth options:
 
