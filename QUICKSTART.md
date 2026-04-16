@@ -54,6 +54,7 @@ Recommended:
 
 - API_AUTH_TOKENS_JSON for scoped token grants
 - API_AUTH_TOKEN only for backward compatibility
+- WG_CLIENT_ALLOWED_IPS=$WG_NETWORK to keep routing peer-to-peer inside the VPN subnet
 
 ## Verify Health
 

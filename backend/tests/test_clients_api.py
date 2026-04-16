@@ -131,6 +131,29 @@ def test_stats_and_connected_clients(client, db_session, monkeypatch):
     assert body[0]["transfer_tx"] == 2048
 
 
+def test_get_client_config_uses_configured_allowed_ips(client, db_session, monkeypatch):
+    _mock_wireguard(monkeypatch)
+    monkeypatch.setattr(clients_api.wireguard_service, "allowed_ips", "10.0.0.0/24", raising=False)
+
+    db_client = Client(
+        email="config@example.com",
+        name="Config",
+        public_key="pub-config",
+        private_key="priv-config",
+        ip_address="10.0.0.13",
+        preshared_key="psk-config",
+        dns="1.1.1.1",
+        is_active=True,
+    )
+    db_session.add(db_client)
+    db_session.commit()
+    db_session.refresh(db_client)
+
+    response = client.get(f"/api/peers/{db_client.id}/config")
+    assert response.status_code == 200
+    assert "AllowedIPs = 10.0.0.0/24" in response.json()["config"]
+
+
 def test_toggle_and_delete_client(client, db_session, monkeypatch):
     _mock_wireguard(monkeypatch)
 
