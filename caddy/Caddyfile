@@ -23,18 +23,23 @@
     # Enable gzip compression
     encode gzip
 
-    # Security headers
+    # Security headers (OWASP Secure Headers Project best practices)
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Content-Type-Options "nosniff"
         X-Frame-Options "SAMEORIGIN"
         Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
-        Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+        # Deny all browser feature APIs not required by this management interface
+        Permissions-Policy "accelerometer=(), ambient-light-sensor=(), autoplay=(), battery=(), camera=(), cross-origin-isolated=(), display-capture=(), document-domain=(), encrypted-media=(), execution-while-not-rendered=(), execution-while-out-of-viewport=(), fullscreen=(), geolocation=(), gyroscope=(), keyboard-map=(), magnetometer=(), microphone=(), midi=(), navigation-override=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), sync-xhr=(), usb=(), web-share=(), xr-spatial-tracking=()"
         Referrer-Policy "strict-origin-when-cross-origin"
         X-Permitted-Cross-Domain-Policies "none"
         Cross-Origin-Opener-Policy "same-origin"
         Cross-Origin-Embedder-Policy "require-corp"
         Cross-Origin-Resource-Policy "same-origin"
+        # Prevent caching of all responses: every page in this management UI contains sensitive data
+        Cache-Control "no-store"
+        -Server
+        -X-Powered-By
     }
 
     # Logging
