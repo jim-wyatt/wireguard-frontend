@@ -42,6 +42,7 @@ class WireGuardService:
         self.server_endpoint = settings.WG_SERVER_ENDPOINT
         self.network = settings.WG_NETWORK
         self.dns = settings.WG_DNS
+        self.allowed_ips = settings.WG_CLIENT_ALLOWED_IPS.strip() or self.network
     
     def generate_keys(self) -> tuple[str, str]:
         """Generate WireGuard private and public keys"""
@@ -110,7 +111,7 @@ DNS = {dns_servers}
 [Peer]
 PublicKey = {self.server_public_key}
 Endpoint = {self.server_endpoint}
-AllowedIPs = 0.0.0.0/0, ::/0
+AllowedIPs = {self.allowed_ips}
 PersistentKeepalive = 25
 """
         return config

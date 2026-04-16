@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     WG_SERVER_ENDPOINT: str = ""
     WG_NETWORK: str = "10.0.0.0/24"
     WG_DNS: str = "1.1.1.1,8.8.8.8"
+    WG_CLIENT_ALLOWED_IPS: str = ""
     CADDY_ACCESS_LOG_PATH: str = "/var/log/caddy/access.log"
     METRICS_ENDPOINT_URL: str = "http://127.0.0.1:2019/metrics"
     NODE_EXPORTER_ENDPOINT_URL: str = "http://127.0.0.1:9100/metrics"
